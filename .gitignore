@@ -1,5 +1,6 @@
 HELP.md
 target/
+!target/*.jar
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -18,6 +19,8 @@ target/
 *.iws
 *.iml
 *.ipr
+*.swp
+*.swo
 
 ### NetBeans ###
 /nbproject/private/
@@ -31,3 +34,33 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temp
+tmp/
+temp/
+EOF
+
+### PostgreSQL / Local Database ###
+# Локальные данные DataGrip / IntelliJ
+dataSources/
+dataSources.local.xml
+storage_v2/
+
+# Каталоги данных Docker PostgreSQL (если появятся)
+pgdata/
+postgres-data/
+data/
+db/
+
+# SQLite / H2
+*.db
+*.mv.db
+*.h2.db
