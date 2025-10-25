@@ -13,6 +13,7 @@ public interface CardInfoMapper {
     CardInfo toEntity(CardInfoDto dto);
 
     @Mapping(target = "userId", source = "user.id")
+    CardInfoDto toDto(CardInfo entity);
 
 
     default User mapUser(Long userId) {
