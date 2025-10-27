@@ -1,10 +1,10 @@
 package com.innowise.demo.mapper;
 
-
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -20,36 +20,11 @@ public abstract class UserMapper {
     @Autowired
     protected CardInfoMapper cardInfoMapper;
 
-    //@Mapping(target = "cardIds", expression = "java(user.getCards() != null ? user.getCards().stream().map(c -> c.getId()).collect(Collectors.toList()) : null)")
-    // @Mapping(target = "birthDate", source = "birthDate") // поле LocalDate может иметь разное имя
-    @Mapping(target = "cards", source = "cards", qualifiedByName = "mapCardListToDto")
-    //@Mapping(target = "cards", source = "cards") // временно игнорируем
-    //@Mapping(target = "cards", ignore = true) // временно игнорируем
-    public abstract UserDto toDto(User user);
-
-    //@Mapping(target = "birthDate", source = "birthDate")
-    //@Mapping(target = "cards", ignore = true) // карты устанавливаются отдельно
-
-    //@Mapping(target = "cards", source = "cards" , expression = "java(dto.getCards() != null ? new ArrayList<>(dto.getCards().stream().map(c -> cardMapper.toEntity(c)).toList()) : null)")
-    @Mapping(target = "cards", expression = "java(dto.getCards() != null ? new java.util.ArrayList<>(dto.getCards().stream().map(cardInfoMapper::toEntity).toList()) : null)")
+    @Mapping(target = "cards", ignore = true) // управление картами вручную в сервисе
     public abstract User toEntity(UserDto dto);
-//    @BeanMapping(ignoreByDefault = true)//говорим MapStruct: «по умолчанию игнорировать все поля, явно мапим только нужные»
-//    @Mapping(target = "id", source = "id")
-//    @Mapping(target = "name", source = "name")
-//    @Mapping(target = "surname", source = "surname")
-//    @Mapping(target = "birthDate", source = "birthDate")
-//    @Mapping(target = "email", source = "email")
 
-
-    // public abstract User toEntity(UserDto dto);
-
-    // Вспомогательные методы для маппинга карт
-//    @Named("mapCardListToDto")
-//    default List<CardInfoDto> mapCardListToDto(List<CardInfo> cards) {
-//        if (cards == null) return null;
-//        return cards.stream().collect(Collectors.toList());
-//    }
-
+    @Mapping(target = "cards", source = "cards", qualifiedByName = "mapCardListToDto")
+    public abstract UserDto toDto(User user);
 
     @Named("mapCardListToDto")
     protected List<CardInfoDto> mapCardListToDto(List<CardInfo> cards) {
@@ -59,9 +34,33 @@ public abstract class UserMapper {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Вспомогательный метод для обновления списка карт пользователя.
+     * Используется внутри UserService.updateUser.
+     */
+    public List<CardInfo> updateCards(User user, List<CardInfoDto> cardDtos) {
+        if (cardDtos == null) return new ArrayList<>();
 
-    public CardInfoMapper getCardInfoMapper() {
-        return cardInfoMapper;
+        Map<Long, CardInfo> existingCardsMap = user.getCards().stream()
+                .collect(Collectors.toMap(CardInfo::getId, c -> c));
+
+        List<CardInfo> updatedCards = new ArrayList<>();
+
+        for (CardInfoDto dto : cardDtos) {
+            if (dto.getId() != null && existingCardsMap.containsKey(dto.getId())) {
+                CardInfo existingCard = existingCardsMap.get(dto.getId());
+                existingCard.setNumber(dto.getNumber());
+                existingCard.setHolder(dto.getHolder());
+                existingCard.setExpirationDate(dto.getExpirationDate());
+                updatedCards.add(existingCard);
+            } else {
+                CardInfo newCard = cardInfoMapper.toEntity(dto);
+                newCard.setUser(user);
+                updatedCards.add(newCard);
+            }
+        }
+
+        return updatedCards;
     }
-
 }
+

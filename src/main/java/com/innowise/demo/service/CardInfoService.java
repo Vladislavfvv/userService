@@ -23,10 +23,10 @@ public class CardInfoService {
     private final UserRepository userRepository;
 
     public CardInfoDto save(CardInfoDto dto) {
-        // return cardInfoRepository.save(cardInfo);
         User user = userRepository.findById(dto.getUserId())
                 .orElseThrow(
                         () -> new EntityNotFoundException("User not found with id: " + dto.getUserId()));
+
         CardInfo entity = cardInfoMapper.toEntity(dto);
         entity.setUser(user);
 
@@ -36,7 +36,6 @@ public class CardInfoService {
     }
 
     public CardInfoDto getCardInfoById(Long id) {
-//        return cardInfoRepository.findById(id).orElse(null);
         CardInfo cardInfo = cardInfoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("CardInfo with id " + id + " not found"));
         return cardInfoMapper.toDto(cardInfo);
@@ -63,9 +62,10 @@ public class CardInfoService {
     }
 
     public void deleteCardInfo(Long id) {
-        if (!cardInfoRepository.existsById(id)) {
-            throw new EntityNotFoundException("CardInfo with id " + id + " not found");
-        }
+        CardInfo card = cardInfoRepository.findById(id)
+                .orElseThrow(
+                        () -> new EntityNotFoundException("CardInfo with id " + id + " not found"));
+
         cardInfoRepository.deleteById(id);
     }
 }

@@ -47,8 +47,8 @@ public class User {
     private String email;
 
     @OneToMany(mappedBy = "user",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true)
+            cascade = CascadeType.ALL)//,
+           // orphanRemoval = true)
     @JsonManagedReference//"ведущий" объект (с которого начинается сериализация)
     private List<CardInfo> cards = new ArrayList<>();
 

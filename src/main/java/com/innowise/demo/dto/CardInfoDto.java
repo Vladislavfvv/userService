@@ -27,7 +27,4 @@ public class CardInfoDto {
 
     @NotNull(message = "Expiration date is required")
     private LocalDate expirationDate;
-
-    //    public Long getUserId() { return userId; }
-//    public void setUserId(Long userId) { this.userId = userId; }
 }

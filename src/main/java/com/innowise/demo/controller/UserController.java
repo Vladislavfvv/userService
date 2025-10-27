@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.innowise.demo.dto.UserDto;
-import com.innowise.demo.model.User;
 import com.innowise.demo.service.UserService;
 
 import lombok.RequiredArgsConstructor;
@@ -37,19 +36,19 @@ public class UserController {
         return ResponseEntity.ok(userService.findAllUsers(page, size));
     }
 
-    //find user by email named variant
+    //find user by email named
     @GetMapping("/email/named/{email}")
     public  ResponseEntity<UserDto> getUserByEmailNamed(@PathVariable String email) {
         return ResponseEntity.ok(userService.getUserByEmailNamed(email));
     }
 
-    //find user by email named variant
+    //find user by email named
     @GetMapping("/email/jpql/{email}")
     public ResponseEntity<UserDto> getUserByEmailJSQL(@PathVariable String email) {
         return ResponseEntity.ok(userService.getUserByEmailJPQl(email));
     }
 
-    //find user by email named variant
+    //find user by email named
     @GetMapping("/email/native/{email}")
     public ResponseEntity<UserDto> getUserByEmailNative(@PathVariable String email) {
         return ResponseEntity.ok(userService.getUserByEmailNative(email));
@@ -65,46 +64,4 @@ public class UserController {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
-
-
-
-
-//    @PostMapping
-//    public User createUser(@RequestBody User user) {
-//        return userService.createUser(user);
-//    }
-//
-//    @GetMapping
-//    public Page<User> getAllUsers(@RequestParam(defaultValue = "0") int page,
-//                                  @RequestParam(defaultValue = "10") int size) {
-//        return userService.findAllUsers(page, size);
-//    }
-//
-//    //find user by email named variant
-//    @GetMapping("/email/named/{email}")
-//    public User getUserByEmailNamed(@PathVariable String email) {
-//        return userService.getUserByEmailNamed(email);
-//    }
-//
-//    //find user by email named variant
-//    @GetMapping("/email/jpql/{email}")
-//    public User getUserByEmailJSQL(@PathVariable String email) {
-//        return userService.getUserByEmailJPQl(email);
-//    }
-//
-//    //find user by email named variant
-//    @GetMapping("/email/native/{email}")
-//    public User getUserByEmailNative(@PathVariable String email) {
-//        return userService.getUserByEmailNative(email);
-//    }
-//
-//    @PutMapping("/{id}")
-//    public User updateUser(@PathVariable Long id, @RequestBody User user) {
-//        return userService.updateUser(id, user);
-//    }
-//
-//    @DeleteMapping("/{id}")
-//    public void deleteUser(@PathVariable Long id) {
-//        userService.deleteUser(id);
-//    }
 }
