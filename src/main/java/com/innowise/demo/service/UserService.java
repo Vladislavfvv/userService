@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.dto.UserDto;
+import com.innowise.demo.exception.UserAlreadyExistsException;
+import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.UserMapper;
 import com.innowise.demo.model.CardInfo;
 import com.innowise.demo.model.User;
@@ -28,6 +30,15 @@ public class UserService {
     private final CardInfoRepository cardInfoRepository;
 
     public UserDto createUser(UserDto dto) {
+        // Проверяем, есть ли уже пользователь с таким email
+        if (userRepository.findByEmailNativeQuery(dto.getEmail()).isPresent()) {
+            try {
+                throw new UserAlreadyExistsException(
+                        "User with email " + dto.getEmail() + " already exists");
+            } catch (UserAlreadyExistsException e) {
+                throw new RuntimeException(e);
+            }
+        }
         // Маппим пользователя без карт
         User entity = userMapper.toEntity(dto);
 
@@ -48,7 +59,7 @@ public class UserService {
     public UserDto findUserById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(
-                        () -> new EntityNotFoundException("User with id " + id + " not found!"));
+                        () -> new UserNotFoundException("User with id " + id + " not found!"));
 
         return userMapper.toDto(user);
     }
@@ -62,7 +73,7 @@ public class UserService {
     // get by email
     public UserDto getUserByEmailNamed(String email) {
         User user = userRepository.findByEmailNamed(email)
-                .orElseThrow(() -> new EntityNotFoundException("User with email " + email + " not found!"));
+                .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
 
         return userMapper.toDto(user);
     }
@@ -70,7 +81,7 @@ public class UserService {
     // get by email JPQL
     public UserDto getUserByEmailJPQl(String email) {
         User user = userRepository.findByEmailJPQL(email)
-                .orElseThrow(() -> new EntityNotFoundException("User with email " + email + " not found!"));
+                .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
 
         return userMapper.toDto(user);
     }
@@ -78,7 +89,7 @@ public class UserService {
     // get by email Native
     public UserDto getUserByEmailNative(String email) {
         User user = userRepository.findByEmailNativeQuery(email)
-                .orElseThrow(() -> new EntityNotFoundException("User with email " + email + " not found!"));
+                .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
 
         return userMapper.toDto(user);
     }
@@ -86,7 +97,7 @@ public class UserService {
     @Transactional
     public UserDto updateUser(Long id, UserDto dto) {
         User existUser = userRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("User with id " + id + " not found!"));
+                .orElseThrow(() -> new UserNotFoundException("User with id " + id + " not found!"));
 
         // Обновляем простые поля
         existUser.setName(dto.getName());
@@ -137,7 +148,7 @@ public class UserService {
     @Transactional
     public void deleteUser(Long id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
+                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
 
         // Удаляем все карты пользователя вручную
         List<CardInfo> cards = user.getCards();

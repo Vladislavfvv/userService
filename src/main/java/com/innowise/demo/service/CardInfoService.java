@@ -7,6 +7,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 import com.innowise.demo.dto.CardInfoDto;
+import com.innowise.demo.exception.CardInfoNotFoundException;
+import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.CardInfoMapper;
 import com.innowise.demo.model.CardInfo;
 import com.innowise.demo.model.User;
@@ -25,7 +27,7 @@ public class CardInfoService {
     public CardInfoDto save(CardInfoDto dto) {
         User user = userRepository.findById(dto.getUserId())
                 .orElseThrow(
-                        () -> new EntityNotFoundException("User not found with id: " + dto.getUserId()));
+                        () -> new UserNotFoundException("User not found with id: " + dto.getUserId()));
 
         CardInfo entity = cardInfoMapper.toEntity(dto);
         entity.setUser(user);
@@ -37,20 +39,23 @@ public class CardInfoService {
 
     public CardInfoDto getCardInfoById(Long id) {
         CardInfo cardInfo = cardInfoRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("CardInfo with id " + id + " not found"));
+                .orElseThrow(() -> new CardInfoNotFoundException("CardInfo with id " + id + " not found"));
         return cardInfoMapper.toDto(cardInfo);
     }
 
     public Page<CardInfoDto> getAllCardInfos(int page, int size) {
-        return cardInfoRepository.findAll(PageRequest.of(page, size))
+         Page<CardInfoDto> dto =  cardInfoRepository.findAll(PageRequest.of(page, size))
                 .map(cardInfoMapper::toDto);
 
+         if(dto.isEmpty()) throw new CardInfoNotFoundException("CardInfo list is empty");
+
+        return dto;
     }
 
     @Transactional
     public CardInfoDto updateCardInfo(Long id, CardInfoDto dto) {
         CardInfo existing = cardInfoRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("CardInfo with id " + id + " not found"));
+                .orElseThrow(() -> new CardInfoNotFoundException("CardInfo with id " + id + " not found"));
 
         existing .setNumber(dto.getNumber());
         existing .setHolder(dto.getHolder());
@@ -65,7 +70,7 @@ public class CardInfoService {
     public void deleteCardInfo(Long id) {
         CardInfo card = cardInfoRepository.findById(id)
                 .orElseThrow(
-                        () -> new EntityNotFoundException("CardInfo with id " + id + " not found"));
+                        () -> new CardInfoNotFoundException("CardInfo with id " + id + " not found"));
 
         cardInfoRepository.deleteById(id);
     }

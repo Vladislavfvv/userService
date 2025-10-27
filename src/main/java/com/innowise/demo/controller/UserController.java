@@ -29,6 +29,11 @@ public class UserController {
         return ResponseEntity.ok(userService.createUser(dto));
     }
 
+    @GetMapping("/id")
+    public ResponseEntity<UserDto> getUserById(@RequestParam Long id) {
+        return ResponseEntity.ok(userService.findUserById(id));
+    }
+
     @GetMapping
     public ResponseEntity<Page<UserDto>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
