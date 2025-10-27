@@ -20,8 +20,10 @@ public abstract class UserMapper {
     @Autowired
     protected CardInfoMapper cardInfoMapper;
 
-    @Mapping(target = "cards", ignore = true) // управление картами вручную в сервисе
+    @Mapping(target = "cards", source = "cards") // НЕ игнорируем cards — пусть маппятся через CardInfoMapper
     public abstract User toEntity(UserDto dto);
+
+
 
     @Mapping(target = "cards", source = "cards", qualifiedByName = "mapCardListToDto")
     public abstract UserDto toDto(User user);

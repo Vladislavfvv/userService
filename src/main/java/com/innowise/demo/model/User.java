@@ -50,6 +50,7 @@ public class User {
             cascade = CascadeType.ALL)//,
            // orphanRemoval = true)
     @JsonManagedReference//"ведущий" объект (с которого начинается сериализация)
+            //Убирает рекурсию при сериализации в JSON
     private List<CardInfo> cards = new ArrayList<>();
 
 

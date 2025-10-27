@@ -61,6 +61,7 @@ public class CardInfoService {
         return cardInfoMapper.toDto(cardInfoRepository.save(existing));
     }
 
+    @Transactional
     public void deleteCardInfo(Long id) {
         CardInfo card = cardInfoRepository.findById(id)
                 .orElseThrow(
