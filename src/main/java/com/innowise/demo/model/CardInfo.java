@@ -43,4 +43,7 @@ public class CardInfo {
 
     @Column(name = "expiration_date")
     private LocalDate expirationDate;
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 }

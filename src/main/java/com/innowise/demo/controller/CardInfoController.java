@@ -1,6 +1,9 @@
 package com.innowise.demo.controller;
 
+import jakarta.validation.Valid;
+
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.innowise.demo.model.CardInfo;
+import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.service.CardInfoService;
 
 import lombok.RequiredArgsConstructor;
@@ -23,17 +26,18 @@ public class CardInfoController {
     private final CardInfoService cardInfoService;
 
     @PostMapping
-    public ResponseEntity<CardInfo> addCardInfo(@RequestBody CardInfo cardInfo) {
-        return ResponseEntity.ok(cardInfoService.save(cardInfo));
+    public ResponseEntity<CardInfoDto> addCardInfo(@Valid @RequestBody CardInfoDto cardInfoDto) {
+       CardInfoDto created = cardInfoService.save(cardInfoDto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CardInfo> getCardInfoById(@PathVariable Long id) {
+    public ResponseEntity<CardInfoDto> getCardInfoById(@PathVariable Long id) {
         return ResponseEntity.ok(cardInfoService.getCardInfoById(id));
     }
 
     @GetMapping
-    public ResponseEntity<Page<CardInfo>> getAllCardInfos(
+    public ResponseEntity<Page<CardInfoDto>> getAllCardInfos(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
@@ -41,13 +45,14 @@ public class CardInfoController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CardInfo> updateCardInfo(@PathVariable Long id, @RequestBody CardInfo cardInfo) {
-        return ResponseEntity.ok(cardInfoService.updateCardInfo(id, cardInfo));
+    public ResponseEntity<CardInfoDto> updateCardInfo(@PathVariable Long id,
+                                                      @Valid @RequestBody CardInfoDto dto) {
+        return ResponseEntity.ok(cardInfoService.updateCardInfo(id, dto));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCardInfo(@PathVariable Long id) {
         cardInfoService.deleteCardInfo(id);
-        return null;
+        return ResponseEntity.noContent().build();
     }
 }

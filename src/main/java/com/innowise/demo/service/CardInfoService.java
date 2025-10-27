@@ -5,8 +5,13 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import jakarta.transaction.Transactional;
+import com.innowise.demo.dto.CardInfoDto;
+import com.innowise.demo.mapper.CardInfoMapper;
 import com.innowise.demo.model.CardInfo;
+import com.innowise.demo.model.User;
 import com.innowise.demo.repository.CardInfoRepository;
+import com.innowise.demo.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -14,30 +19,53 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CardInfoService {
     private final CardInfoRepository cardInfoRepository;
+    private final CardInfoMapper cardInfoMapper;
+    private final UserRepository userRepository;
 
-    public CardInfo save(CardInfo cardInfo) {
-        return cardInfoRepository.save(cardInfo);
+    public CardInfoDto save(CardInfoDto dto) {
+        // return cardInfoRepository.save(cardInfo);
+        User user = userRepository.findById(dto.getUserId())
+                .orElseThrow(
+                        () -> new EntityNotFoundException("User not found with id: " + dto.getUserId()));
+        CardInfo entity = cardInfoMapper.toEntity(dto);
+        entity.setUser(user);
+
+        CardInfo saved = cardInfoRepository.save(entity);
+        return cardInfoMapper.toDto(saved);
+
     }
 
-    public CardInfo getCardInfoById(Long id) {
+    public CardInfoDto getCardInfoById(Long id) {
 //        return cardInfoRepository.findById(id).orElse(null);
-        return cardInfoRepository.findById(id)
+        CardInfo cardInfo = cardInfoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("CardInfo with id " + id + " not found"));
+        return cardInfoMapper.toDto(cardInfo);
     }
 
-    public Page<CardInfo> getAllCardInfos(int page, int size) {
-        return cardInfoRepository.findAll(PageRequest.of(page, size));
+    public Page<CardInfoDto> getAllCardInfos(int page, int size) {
+        return cardInfoRepository.findAll(PageRequest.of(page, size))
+                .map(cardInfoMapper::toDto);
+
     }
 
-    public CardInfo updateCardInfo(Long id, CardInfo updateCardInfo) {
-        CardInfo existCardInfo = getCardInfoById(id);
-        existCardInfo.setNumber(updateCardInfo.getNumber());
-        existCardInfo.setHolder(updateCardInfo.getHolder());
-        existCardInfo.setExpirationDate(updateCardInfo.getExpirationDate());
-        return cardInfoRepository.save(existCardInfo);
+    @Transactional
+    public CardInfoDto updateCardInfo(Long id, CardInfoDto dto) {
+        CardInfo existing = cardInfoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("CardInfo with id " + id + " not found"));
+
+        existing .setNumber(dto.getNumber());
+        existing .setHolder(dto.getHolder());
+        existing .setExpirationDate(dto.getExpirationDate());
+        if (dto.getUserId() != null && (existing.getUser() == null || !existing.getUser().getId().equals(dto.getUserId()))) {
+            existing.setUser(cardInfoMapper.mapUser(dto.getUserId()));
+        }
+        return cardInfoMapper.toDto(cardInfoRepository.save(existing));
     }
 
     public void deleteCardInfo(Long id) {
+        if (!cardInfoRepository.existsById(id)) {
+            throw new EntityNotFoundException("CardInfo with id " + id + " not found");
+        }
         cardInfoRepository.deleteById(id);
     }
 }
