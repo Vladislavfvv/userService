@@ -23,8 +23,8 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "users", schema = "userservice_data")
-//@Getter
-//@Setter
+@Getter
+@Setter
 @NoArgsConstructor
 @NamedQueries({
         @NamedQuery(

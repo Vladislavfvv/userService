@@ -5,17 +5,21 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
 @Data
+        //@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@class")
 public class CardInfoDto {
     private Long id;
 
-    @Setter
-    @Getter
-    @NotNull(message = "User ID is required")
+//    @Setter
+//    @Getter
+            //@NotNull(message = "User ID is required")
     private Long userId;
 
     @NotBlank(message = "Card number must not be blank")
@@ -26,5 +30,14 @@ public class CardInfoDto {
     private String holder;
 
     @NotNull(message = "Expiration date is required")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate expirationDate;
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
 }

@@ -11,7 +11,6 @@ import org.springframework.data.repository.query.Param;
 import com.innowise.demo.model.User;
 
 public interface UserRepository extends JpaRepository<User, Long> {
-  //  void createUser(User user);
 
     User getUserById(Long aLong);
 
@@ -19,18 +18,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * ADD  methods!!!
      * @return
      */
-  //  List<User> getAllWithPagination();
-
     List<User> getUsersByEmail(String email);
-
-//    @Override
-//    Page<User> findAll(Pageable pageable);
-
-   // User updateUser(User user);
-
-  //  void deleteUserById(Long id);
-
-   // User findByUsername(String username);
 
     /// /////////////////////////////////////
     //Используется @NamedQuery из User.java

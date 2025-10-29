@@ -33,6 +33,8 @@ public class CardInfo {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Setter
+    @Getter
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     @JsonBackReference//"обратная" ссылка, Jackson её пропускает при сериализации.
@@ -44,6 +46,4 @@ public class CardInfo {
     @Column(name = "expiration_date")
     private LocalDate expirationDate;
 
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
 }

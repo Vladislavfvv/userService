@@ -28,8 +28,6 @@
     </scm>
     <properties>
         <java.version>21</java.version>
-        <!--        <maven.compiler.source>21</maven.compiler.source>-->
-        <!--        <maven.compiler.target>21</maven.compiler.target>-->
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok.version>1.18.34</lombok.version>
     </properties>
@@ -72,21 +70,30 @@
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
-            <!--<version>1.5.5.Final</version>-->
             <version>${mapstruct.version}</version>
         </dependency>
-        <!--        <dependency>-->
-        <!--            <groupId>org.mapstruct</groupId>-->
-        <!--            <artifactId>mapstruct-processor</artifactId>-->
-        <!--            <version>1.5.5.Final</version>-->
-        <!--            <scope>provided</scope>-->
-        <!--        </dependency>-->
+
 
         <!-- Liquibase -->
         <dependency>
             <groupId>org.liquibase</groupId>
             <artifactId>liquibase-core</artifactId>
         </dependency>
+
+        <!-- Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
 
         <!-- Test -->
         <dependency>
@@ -130,137 +137,6 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
         </plugins>
-        <!--    <dependencies>-->
-
-        <!--        &lt;!&ndash; Spring Boot Web &ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.springframework.boot</groupId>-->
-        <!--            <artifactId>spring-boot-starter-web</artifactId>-->
-        <!--        </dependency>-->
-
-        <!--        &lt;!&ndash; Spring Data JPA + Hibernate  &ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.springframework.boot</groupId>-->
-        <!--            <artifactId>spring-boot-starter-data-jpa</artifactId>-->
-        <!--        </dependency>-->
-
-        <!--        &lt;!&ndash; Spring Jakarta validation &ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.springframework.boot</groupId>-->
-        <!--            <artifactId>spring-boot-starter-validation</artifactId>-->
-        <!--        </dependency>-->
-
-        <!--        &lt;!&ndash; PostgreSQL &ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.postgresql</groupId>-->
-        <!--            <artifactId>postgresql</artifactId>-->
-        <!--            <scope>runtime</scope>-->
-        <!--        </dependency>-->
-
-        <!--        &lt;!&ndash; Lombok &ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.projectlombok</groupId>-->
-        <!--            <artifactId>lombok</artifactId>-->
-        <!--            &lt;!&ndash;<optional>true</optional> &ndash;&gt;-->
-        <!--            <version>1.18.30</version>-->
-        <!--            <scope>provided</scope>-->
-        <!--        </dependency>-->
-
-        <!--        &lt;!&ndash; MapStruct &ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.mapstruct</groupId>-->
-        <!--            <artifactId>mapstruct</artifactId>-->
-        <!--            <version>1.6.3</version>-->
-        <!--        </dependency>-->
-
-        <!--        &lt;!&ndash; MapStruct processor (компилятор аннотаций) &ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.mapstruct</groupId>-->
-        <!--            <artifactId>mapstruct-processor</artifactId>-->
-        <!--            <version>1.6.3</version>-->
-        <!--            <scope>provided</scope>-->
-        <!--        </dependency>-->
-
-        <!--        &lt;!&ndash; Tests &ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.springframework.boot</groupId>-->
-        <!--            <artifactId>spring-boot-starter-test</artifactId>-->
-        <!--            <scope>test</scope>-->
-        <!--        </dependency>-->
-
-        <!--        &lt;!&ndash; Liquibase &ndash;&gt;-->
-        <!--        <dependency>-->
-        <!--            <groupId>org.liquibase</groupId>-->
-        <!--            <artifactId>liquibase-core</artifactId>-->
-        <!--        </dependency>-->
-        <!--    </dependencies>-->
-
-        <!--    <build>-->
-        <!--        <plugins>-->
-        <!--            <plugin>-->
-        <!--                <groupId>org.apache.maven.plugins</groupId>-->
-        <!--                <artifactId>maven-compiler-plugin</artifactId>-->
-        <!--                <version>3.11.0</version>-->
-        <!--                <configuration>-->
-        <!--                    <source>${java.version}</source>-->
-        <!--                    <target>${java.version}</target>-->
-        <!--                    <annotationProcessorPaths>-->
-        <!--                        <path>-->
-        <!--                            <groupId>org.mapstruct</groupId>-->
-        <!--                            <artifactId>mapstruct-processor</artifactId>-->
-        <!--                            <version>1.6.3</version>-->
-        <!--                        </path>-->
-        <!--                        <path>-->
-        <!--                            <groupId>org.projectlombok</groupId>-->
-        <!--                            <artifactId>lombok</artifactId>-->
-        <!--                            <version>1.18.30</version> &lt;!&ndash; или последняя версия &ndash;&gt;-->
-        <!--                        </path>-->
-        <!--                    </annotationProcessorPaths>-->
-        <!--                </configuration>-->
-        <!--            </plugin>-->
-
-        <!--            &lt;!&ndash;            <plugin>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <groupId>org.apache.maven.plugins</groupId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <artifactId>maven-compiler-plugin</artifactId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <configuration>&ndash;&gt;-->
-        <!--&lt;!&ndash;                    <annotationProcessorPaths>&ndash;&gt;-->
-        <!--&lt;!&ndash;                        <path>&ndash;&gt;-->
-        <!--&lt;!&ndash;                            <groupId>org.projectlombok</groupId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                            <artifactId>lombok</artifactId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                        </path>&ndash;&gt;-->
-        <!--&lt;!&ndash;                    </annotationProcessorPaths>&ndash;&gt;-->
-        <!--&lt;!&ndash;                </configuration>&ndash;&gt;-->
-        <!--&lt;!&ndash;            </plugin>&ndash;&gt;-->
-        <!--&lt;!&ndash;            <plugin>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <groupId>org.springframework.boot</groupId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <artifactId>spring-boot-maven-plugin</artifactId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <configuration>&ndash;&gt;-->
-        <!--&lt;!&ndash;                    <excludes>&ndash;&gt;-->
-        <!--&lt;!&ndash;                        <exclude>&ndash;&gt;-->
-        <!--&lt;!&ndash;                            <groupId>org.projectlombok</groupId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                            <artifactId>lombok</artifactId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                        </exclude>&ndash;&gt;-->
-        <!--&lt;!&ndash;                    </excludes>&ndash;&gt;-->
-        <!--&lt;!&ndash;                </configuration>&ndash;&gt;-->
-        <!--&lt;!&ndash;            </plugin>&ndash;&gt;-->
-        <!--&lt;!&ndash;            &lt;!&ndash; Обязательно для MapStruct &ndash;&gt;&ndash;&gt;-->
-        <!--&lt;!&ndash;            <plugin>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <groupId>org.apache.maven.plugins</groupId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <artifactId>maven-compiler-plugin</artifactId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <version>3.11.0</version>&ndash;&gt;-->
-        <!--&lt;!&ndash;                <configuration>&ndash;&gt;-->
-        <!--&lt;!&ndash;                    <source>21</source>&ndash;&gt;-->
-        <!--&lt;!&ndash;                    <target>21</target>&ndash;&gt;-->
-        <!--&lt;!&ndash;                    <annotationProcessorPaths>&ndash;&gt;-->
-        <!--&lt;!&ndash;                        <path>&ndash;&gt;-->
-        <!--&lt;!&ndash;                            <groupId>org.mapstruct</groupId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                            <artifactId>mapstruct-processor</artifactId>&ndash;&gt;-->
-        <!--&lt;!&ndash;                            <version>1.6.0.Final</version>&ndash;&gt;-->
-        <!--&lt;!&ndash;                        </path>&ndash;&gt;-->
-        <!--&lt;!&ndash;                    </annotationProcessorPaths>&ndash;&gt;-->
-        <!--&lt;!&ndash;                </configuration>&ndash;&gt;-->
-        <!--&lt;!&ndash;            </plugin>&ndash;&gt;-->
-        <!--        </plugins>-->
     </build>
 
 </project>

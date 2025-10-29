@@ -8,12 +8,73 @@ services:
       POSTGRES_DB: us_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+#      SPRING_REDIS_HOST: redis        # <-- имя контейнера Redis
+#      SPRING_REDIS_PORT: 6379         # <-- порт Redis
     ports:
       - "5432:5432"
     volumes:
+      - pgdata:/var/lib/postgresql/data
       - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    networks:
+      - backend-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d us_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-network
+
+  redis_insight:
+    image: redis/redisinsight:latest
+    container_name: redis_insight
+    restart: always
+    ports:
+      - "5540:5540"
+    depends_on:
+      - redis
+    networks:
+      - backend-network
+
+  user_service:
+    build: .
+    container_name: user_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/us_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8082:8080"
+    networks:
+      - backend-network
+    restart: always
+
+volumes:
+  pgdata:
+  redis_data:
+
+networks:
+  backend-network:
+    driver: bridge

@@ -1,11 +1,14 @@
 package com.innowise.demo.service;
 
-import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.exception.CardInfoNotFoundException;
 import com.innowise.demo.exception.UserNotFoundException;
@@ -24,6 +27,11 @@ public class CardInfoService {
     private final CardInfoMapper cardInfoMapper;
     private final UserRepository userRepository;
 
+    private static final String CARD_CACHE = "cardCache"; // кеш отдельной карты
+    private static final String ALL_CARDS_CACHE = "allCards"; // кеш всех карт
+
+    @CachePut(value = CARD_CACHE, key = "#result.id")
+    @CacheEvict(value = ALL_CARDS_CACHE, allEntries = true)
     public CardInfoDto save(CardInfoDto dto) {
         User user = userRepository.findById(dto.getUserId())
                 .orElseThrow(
@@ -37,12 +45,15 @@ public class CardInfoService {
 
     }
 
+    @Cacheable(value = CARD_CACHE, key = "#id")
     public CardInfoDto getCardInfoById(Long id) {
         CardInfo cardInfo = cardInfoRepository.findById(id)
                 .orElseThrow(() -> new CardInfoNotFoundException("CardInfo with id " + id + " not found"));
         return cardInfoMapper.toDto(cardInfo);
     }
 
+
+    @Cacheable(value = ALL_CARDS_CACHE, key = "{#page, #size}")
     public Page<CardInfoDto> getAllCardInfos(int page, int size) {
          Page<CardInfoDto> dto =  cardInfoRepository.findAll(PageRequest.of(page, size))
                 .map(cardInfoMapper::toDto);
@@ -52,6 +63,10 @@ public class CardInfoService {
         return dto;
     }
 
+    @Caching(
+            put = {@CachePut(value = CARD_CACHE, key = "#id")},
+            evict = {@CacheEvict(value = ALL_CARDS_CACHE, allEntries = true)}
+    )
     @Transactional
     public CardInfoDto updateCardInfo(Long id, CardInfoDto dto) {
         CardInfo existing = cardInfoRepository.findById(id)
@@ -66,6 +81,10 @@ public class CardInfoService {
         return cardInfoMapper.toDto(cardInfoRepository.save(existing));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = CARD_CACHE, key = "#id"),
+            @CacheEvict(value = ALL_CARDS_CACHE, allEntries = true)
+    })
     @Transactional
     public void deleteCardInfo(Long id) {
         CardInfo card = cardInfoRepository.findById(id)

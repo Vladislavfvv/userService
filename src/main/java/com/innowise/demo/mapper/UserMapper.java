@@ -1,8 +1,10 @@
 package com.innowise.demo.mapper;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.mapstruct.Mapper;
@@ -41,21 +43,28 @@ public abstract class UserMapper {
      * Используется внутри UserService.updateUser.
      */
     public List<CardInfo> updateCards(User user, List<CardInfoDto> cardDtos) {
-        if (cardDtos == null) return new ArrayList<>();
+        if (cardDtos == null || cardDtos.isEmpty()) {
+            return new ArrayList<>();
+        }
 
-        Map<Long, CardInfo> existingCardsMap = user.getCards().stream()
+        Map<Long, CardInfo> existingCardsMap = Optional.ofNullable(user.getCards())
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(c -> c.getId() != null)
                 .collect(Collectors.toMap(CardInfo::getId, c -> c));
 
         List<CardInfo> updatedCards = new ArrayList<>();
 
         for (CardInfoDto dto : cardDtos) {
             if (dto.getId() != null && existingCardsMap.containsKey(dto.getId())) {
+                // обновляем существующую карту
                 CardInfo existingCard = existingCardsMap.get(dto.getId());
                 existingCard.setNumber(dto.getNumber());
                 existingCard.setHolder(dto.getHolder());
                 existingCard.setExpirationDate(dto.getExpirationDate());
                 updatedCards.add(existingCard);
             } else {
+                // создаём новую карту
                 CardInfo newCard = cardInfoMapper.toEntity(dto);
                 newCard.setUser(user);
                 updatedCards.add(newCard);

@@ -1,8 +1,8 @@
 package com.innowise.demo.controller;
 
+import java.util.Map;
 import jakarta.validation.Valid;
 
-import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.service.UserService;
 
@@ -35,16 +36,17 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<UserDto>> getAllUsers(
+    public ResponseEntity<PagedUserResponse> getUsers(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "5") int size) {
         return ResponseEntity.ok(userService.findAllUsers(page, size));
     }
+
 
     //find user by email named
     @GetMapping("/email/named/{email}")
     public  ResponseEntity<UserDto> getUserByEmailNamed(@PathVariable String email) {
-        return ResponseEntity.ok(userService.getUserByEmailNamed(email));
+         return ResponseEntity.ok(userService.getUserByEmailNamed(email));
     }
 
     //find user by email named

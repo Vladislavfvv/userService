@@ -4,15 +4,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import jakarta.persistence.EntityNotFoundException;
 
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.innowise.demo.dto.CardInfoDto;
+import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
-import com.innowise.demo.exception.UserAlreadyExistsException;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.UserMapper;
 import com.innowise.demo.model.CardInfo;
@@ -24,39 +27,45 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
+@CacheConfig(cacheNames = "users") // общий префикс для всех методов
 public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final CardInfoRepository cardInfoRepository;
 
+    @CachePut(key = "#result.id")
+    @CacheEvict(value = "users_all", allEntries = true) // очищаем кэш списка
     public UserDto createUser(UserDto dto) {
-        // Проверяем, есть ли уже пользователь с таким email
-        if (userRepository.findByEmailNativeQuery(dto.getEmail()).isPresent()) {
-            try {
-                throw new UserAlreadyExistsException(
-                        "User with email " + dto.getEmail() + " already exists");
-            } catch (UserAlreadyExistsException e) {
-                throw new RuntimeException(e);
-            }
+        dto.setId(null);
+        if (dto.getCards() != null) {
+            dto.getCards().forEach(c -> c.setId(null));
         }
-        // Маппим пользователя без карт
+
+        // Проверка на уникальность email
+        if (userRepository.findByEmailNativeQuery(dto.getEmail()).isPresent()) {
+            throw new RuntimeException("User with email " + dto.getEmail() + " already exists");
+        }
+
+        // Создаём сущность пользователя
         User entity = userMapper.toEntity(dto);
 
-        // Создаём список карт вручную
+        // Привязываем карты (старые и новые)
         List<CardInfo> cards = userMapper.updateCards(entity, dto.getCards());
+        cards.forEach(c -> c.setUser(entity));
         entity.setCards(cards);
 
-        // Устанавливаем связь user -> card
-        cards.forEach(c -> c.setUser(entity));
-
-        // Сохраняем каскадно (CascadeType.ALL)
+        // Hibernate сохранит и пользователя, и все его карты (CascadeType.ALL)
         User saved = userRepository.save(entity);
 
         return userMapper.toDto(saved);
     }
 
     //get by id
+    @Cacheable(key = "#id")
     public UserDto findUserById(Long id) {
+        long start = System.currentTimeMillis();
+        System.out.println("⚙️ Загружаем пользователя из БД, id=" + id);
+        System.out.println("⏱ Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findById(id)
                 .orElseThrow(
                         () -> new UserNotFoundException("User with id " + id + " not found!"));
@@ -64,14 +73,30 @@ public class UserService {
         return userMapper.toDto(user);
     }
 
-    //get all with pagination
-    public Page<UserDto> findAllUsers(int page, int size) {
-        return userRepository.findAll(PageRequest.of(page, size))
-                .map(userMapper::toDto);
+    @Cacheable(value = "users_all", key = "'page_' + #page + '_size_' + #size")
+    public PagedUserResponse findAllUsers(int page, int size) {
+        System.out.println("🧩 Получаем из БД (а не из кэша)");
+        Page<User> users = userRepository.findAll(PageRequest.of(page, size));
+
+        List<UserDto> dtos = users.stream()
+                .map(userMapper::toDto)
+                .toList();
+
+        return new PagedUserResponse(
+                dtos,
+                users.getNumber(),
+                users.getSize(),
+                users.getTotalElements(),
+                users.getTotalPages()
+        );
     }
 
     // get by email
+    @Cacheable(value = "users_by_email", key = "#email")
     public UserDto getUserByEmailNamed(String email) {
+        long start = System.currentTimeMillis();
+        System.out.println("⚙️ Загружаем пользователя из БД, email=" + email);
+        System.out.println("⏱ Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findByEmailNamed(email)
                 .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
 
@@ -79,7 +104,11 @@ public class UserService {
     }
 
     // get by email JPQL
+    @Cacheable(value = "users_by_email", key = "#email")
     public UserDto getUserByEmailJPQl(String email) {
+        long start = System.currentTimeMillis();
+        System.out.println("⚙️ Загружаем пользователя из БД, email=" + email);
+        System.out.println("⏱ Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findByEmailJPQL(email)
                 .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
 
@@ -87,13 +116,19 @@ public class UserService {
     }
 
     // get by email Native
+    @Cacheable(value = "users_by_email", key = "#email")
     public UserDto getUserByEmailNative(String email) {
+        long start = System.currentTimeMillis();
+        System.out.println("⚙️ Загружаем пользователя из БД, email=" + email);
+        System.out.println("⏱ Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findByEmailNativeQuery(email)
                 .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
 
         return userMapper.toDto(user);
     }
 
+    @CachePut(key = "#id")
+    @CacheEvict(value = "users_all", allEntries = true)
     @Transactional
     public UserDto updateUser(Long id, UserDto dto) {
         User existUser = userRepository.findById(id)
@@ -106,9 +141,11 @@ public class UserService {
         existUser.setEmail(dto.getEmail());
 
         if (dto.getCards() != null) {
-            List<CardInfo> updatedCards = new ArrayList<>();
             Map<Long, CardInfo> existingCardsMap = existUser.getCards().stream()
+                    .filter(c -> c.getId() != null)
                     .collect(Collectors.toMap(CardInfo::getId, c -> c));
+
+            List<CardInfo> updatedCards = new ArrayList<>();
 
             for (CardInfoDto cardDto : dto.getCards()) {
                 if (cardDto.getId() != null && existingCardsMap.containsKey(cardDto.getId())) {
@@ -129,32 +166,20 @@ public class UserService {
                 }
             }
 
-            // Удаляем старые карты, которых нет в DTO
-            List<CardInfo> toDelete = existUser.getCards().stream()
-                    .filter(c -> updatedCards.stream().noneMatch(u -> u.getId() != null && u.getId().equals(c.getId())))
-                    .collect(Collectors.toList());
-
-            toDelete.forEach(c -> c.setUser(null));
-            cardInfoRepository.deleteAll(toDelete);
-
-            // Назначаем обновлённый список карт пользователю
-            existUser.setCards(updatedCards);
+            // Обновляем коллекцию (Hibernate удалит старые карты, которых нет)
+            existUser.getCards().clear();
+            existUser.getCards().addAll(updatedCards);
         }
 
         return userMapper.toDto(userRepository.save(existUser));
     }
 
-    //delete + каскадное удаление все CardInfo
+    @CacheEvict(value = "users_all", allEntries = true)
+    @CachePut(key = "#id")
     @Transactional
     public void deleteUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
-
-        // Удаляем все карты пользователя вручную
-        List<CardInfo> cards = user.getCards();
-        if (cards != null && !cards.isEmpty()) {
-            cardInfoRepository.deleteAll(cards);
-        }
 
         userRepository.deleteById(id);
     }
