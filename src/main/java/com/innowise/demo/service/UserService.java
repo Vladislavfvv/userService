@@ -62,10 +62,9 @@ public class UserService {
 
     //get by id
     @Cacheable(key = "#id")
+    @Transactional(readOnly = true)
     public UserDto findUserById(Long id) {
-        long start = System.currentTimeMillis();
-        System.out.println("⚙️ Загружаем пользователя из БД, id=" + id);
-        System.out.println("⏱ Время: " + (System.currentTimeMillis() - start) + " мс");
+        System.out.println("Загружаем пользователя из БД, id=" + id);
         User user = userRepository.findById(id)
                 .orElseThrow(
                         () -> new UserNotFoundException("User with id " + id + " not found!"));
@@ -75,7 +74,7 @@ public class UserService {
 
     @Cacheable(value = "users_all", key = "'page_' + #page + '_size_' + #size")
     public PagedUserResponse findAllUsers(int page, int size) {
-        System.out.println("🧩 Получаем из БД (а не из кэша)");
+        System.out.println("Получаем из БД (а не из кэша)");
         Page<User> users = userRepository.findAll(PageRequest.of(page, size));
 
         List<UserDto> dtos = users.stream()
@@ -93,10 +92,11 @@ public class UserService {
 
     // get by email
     @Cacheable(value = "users_by_email", key = "#email")
+    @Transactional(readOnly = true)
     public UserDto getUserByEmailNamed(String email) {
         long start = System.currentTimeMillis();
-        System.out.println("⚙️ Загружаем пользователя из БД, email=" + email);
-        System.out.println("⏱ Время: " + (System.currentTimeMillis() - start) + " мс");
+        System.out.println("Загружаем пользователя из БД, email=" + email);
+        System.out.println("Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findByEmailNamed(email)
                 .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
 
@@ -105,10 +105,11 @@ public class UserService {
 
     // get by email JPQL
     @Cacheable(value = "users_by_email", key = "#email")
+    @Transactional(readOnly = true)
     public UserDto getUserByEmailJPQl(String email) {
         long start = System.currentTimeMillis();
-        System.out.println("⚙️ Загружаем пользователя из БД, email=" + email);
-        System.out.println("⏱ Время: " + (System.currentTimeMillis() - start) + " мс");
+        System.out.println("Загружаем пользователя из БД, email=" + email);
+        System.out.println("Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findByEmailJPQL(email)
                 .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
 
@@ -117,10 +118,11 @@ public class UserService {
 
     // get by email Native
     @Cacheable(value = "users_by_email", key = "#email")
+    @Transactional(readOnly = true)
     public UserDto getUserByEmailNative(String email) {
         long start = System.currentTimeMillis();
-        System.out.println("⚙️ Загружаем пользователя из БД, email=" + email);
-        System.out.println("⏱ Время: " + (System.currentTimeMillis() - start) + " мс");
+        System.out.println("Загружаем пользователя из БД, email=" + email);
+        System.out.println("Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findByEmailNativeQuery(email)
                 .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
 

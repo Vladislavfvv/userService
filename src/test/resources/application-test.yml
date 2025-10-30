@@ -1,0 +1,33 @@
+  spring:
+    datasource:
+      url: jdbc:postgresql://localhost:5432/testdb?currentSchema=userservice_data
+      username: test
+      password: test
+      driver-class-name: org.postgresql.Driver
+
+    jpa:
+      hibernate:
+        ddl-auto: none
+      show-sql: true
+      properties:
+        hibernate.format_sql: true
+        hibernate.default_schema: userservice_data
+
+    liquibase:
+      change-log: classpath:db/changelog/master-changelog.xml
+      default-schema: userservice_data
+
+#    data:
+#      redis:
+#        host: localhost
+#        port: 6379
+    cache:
+      type: redis
+      redis:
+        time-to-live: 600000
+
+spring:
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    date-format: yyyy-MM-dd

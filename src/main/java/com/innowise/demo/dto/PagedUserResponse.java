@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class PagedUserResponse {
+public class PagedUserResponse {//для отображения страниц при запросе getAllUsers а не списком
     private List<UserDto> content;
     private int page;
     private int size;
