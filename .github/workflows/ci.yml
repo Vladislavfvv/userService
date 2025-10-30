@@ -142,7 +142,8 @@ jobs:
       - name: Build and Push Docker Image to GHCR
         run: |
           IMAGE_NAME=ghcr.io/${{ github.repository }}/user_service
-          TAG=${{ github.sha }}
-          docker build -t $IMAGE_NAME:$TAG .
-          docker push $IMAGE_NAME:$TAG
-          echo " Image pushed: $IMAGE_NAME:$TAG"
+           IMAGE_NAME=$(echo $IMAGE_NAME | tr '[:upper:]' '[:lower:]')  # ← ДОБАВЬТЕ ЭТУ СТРОКУ
+           TAG=${{ github.sha }}
+           docker build -t $IMAGE_NAME:$TAG .
+           docker push $IMAGE_NAME:$TAG
+           echo "Image pushed: $IMAGE_NAME:$TAG"
