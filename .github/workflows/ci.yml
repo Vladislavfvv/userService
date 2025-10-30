@@ -7,6 +7,9 @@ on:
   pull_request:
     branches:
       - main
+permissions:
+  contents: read
+  packages: write       # нужно, чтобы docker push в GHCR работал
 
 jobs:
   build-test-analyze:
@@ -45,13 +48,14 @@ jobs:
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_REDIS_HOST: localhost
       SPRING_REDIS_PORT: 6379
+      MAVEN_OPTS: -Xmx1024m
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: 21
           distribution: temurin
@@ -60,13 +64,28 @@ jobs:
       - name: Verify DB availability
         run: |
           echo "Waiting for PostgreSQL to be ready..."
-          for i in {1..10}; do
-            nc -z localhost 5432 && echo "Postgres ready!" && break
-            sleep 2
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U postgres && echo "Postgres ready" && break
+            sleep 2           
           done
 
+      - name: Create schema userservice_data (if not exists)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          # устанавливаем psql (ubuntu runner) и создаем схему, если нужно
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+          psql -h localhost -U postgres -d us_db -c "CREATE SCHEMA IF NOT EXISTS userservice_data;"
+
+
       - name: Build and Test with Maven
-        run: mvn clean verify -Dspring.profiles.active=local
+        run: mvn clean verify \
+          -Dspring.profiles.active=local \
+          -Dspring.datasource.url=${{ env.SPRING_DATASOURCE_URL }} \
+          -Dspring.datasource.username=${{ env.SPRING_DATASOURCE_USERNAME }} \
+          -Dspring.datasource.password=${{ env.SPRING_DATASOURCE_PASSWORD }} \
+          -Dspring.liquibase.default-schema=userservice_data
 
       - name: Run SonarQube Analysis
         if: always()
@@ -74,7 +93,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          mvn sonar:sonar \
+          mvn -B sonar:sonar \
             -Dsonar.projectKey=UserService \
             -Dsonar.host.url=${{ env.SONAR_HOST_URL }} \
             -Dsonar.login=${{ env.SONAR_TOKEN }}
@@ -85,7 +104,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -97,10 +116,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Build and Push Docker Image to GHCR
         run: |
           IMAGE_NAME=ghcr.io/${{ github.repository }}/user_service
           TAG=${{ github.sha }}
           docker build -t $IMAGE_NAME:$TAG .
           docker push $IMAGE_NAME:$TAG
-          echo "✅ Image pushed: $IMAGE_NAME:$TAG"
+          echo " Image pushed: $IMAGE_NAME:$TAG"
