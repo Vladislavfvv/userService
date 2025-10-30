@@ -108,6 +108,7 @@ jobs:
         run: |
           mvn -B sonar:sonar \
             -Dsonar.projectKey=UserService \
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \          
             -Dsonar.host.url=${{ env.SONAR_HOST_URL }} \
             -Dsonar.login=${{ env.SONAR_TOKEN }}
 
