@@ -8,8 +8,6 @@ services:
       POSTGRES_DB: us_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-#      SPRING_REDIS_HOST: redis        # <-- имя контейнера Redis
-#      SPRING_REDIS_PORT: 6379         # <-- порт Redis
     ports:
       - "5432:5432"
     volumes:
@@ -36,17 +34,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - backend-network
-
-  redis_insight:
-    image: redis/redisinsight:latest
-    container_name: redis_insight
-    restart: always
-    ports:
-      - "5540:5540"
-    depends_on:
-      - redis
     networks:
       - backend-network
 

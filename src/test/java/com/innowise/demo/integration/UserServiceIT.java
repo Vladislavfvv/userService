@@ -38,7 +38,7 @@ class UserServiceIT {
 
     // --- Контейнер PostgreSQL ---
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15")
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
             .withDatabaseName("testdb")
             .withUsername("test")
             .withPassword("test");
