@@ -107,10 +107,10 @@ jobs:
 #          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
           mvn -B sonar:sonar \
-                -Dsonar.organization=Vladislavfvv \
-                -Dsonar.projectKey=Vladislavfvv_userService \
+                -Dsonar.organization=vladislavfvv \                
                 -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
                 -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+                -e
 #          mvn -B sonar:sonar \
 #            -Dsonar.projectKey=UserService \
 #            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
