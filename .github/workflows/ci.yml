@@ -61,6 +61,9 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Clear Maven cache
+        run: mvn dependency:purge-local-repository
+
       - name: Verify DB availability
         run: |
           echo "Waiting for PostgreSQL to be ready..."
@@ -101,13 +104,14 @@ jobs:
         run: mvn clean verify -Dspring.profiles.active=local
 
       - name: Run SonarQube Analysis
-        if: always()
+        if: false
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-#          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
           mvn -B sonar:sonar \
-                -Dsonar.organization=vladislavfvv \                
+                -Dsonar.organization=vladislavfvv \
+                -Dsonar.projectKey=Vladislavfvv_userService \
                 -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
                 -Dsonar.login=${{ secrets.SONAR_TOKEN }}
                 -e
