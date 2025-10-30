@@ -109,8 +109,8 @@ jobs:
           mvn -B sonar:sonar \
             -Dsonar.projectKey=UserService \
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \          
-            -Dsonar.host.url=${{ env.SONAR_HOST_URL }} \
-            -Dsonar.login=${{ env.SONAR_TOKEN }}
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
 
   docker-build:
     needs: build-test-analyze
