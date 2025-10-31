@@ -4,18 +4,18 @@ import jakarta.persistence.EntityNotFoundException;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.springframework.beans.factory.annotation.Autowired;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.model.CardInfo;
 import com.innowise.demo.model.User;
 import com.innowise.demo.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Mapper(componentModel = "spring")
+@RequiredArgsConstructor
 public abstract class CardInfoMapper {
 
-    @Autowired
     protected UserRepository userRepository;
-
 
     @Mapping(target = "userId", source = "user.id")
     public abstract CardInfoDto toDto(CardInfo entity);
