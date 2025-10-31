@@ -73,9 +73,11 @@ public class UserService {
     }
 
     @Cacheable(value = "users_all", key = "'page_' + #page + '_size_' + #size")
+    @Transactional(readOnly = true)//длф решения проблемы ленивой инициализации
     public PagedUserResponse findAllUsers(int page, int size) {
         System.out.println("Получаем из БД (а не из кэша)");
         Page<User> users = userRepository.findAll(PageRequest.of(page, size));
+        //Page<User> users = userRepository.findAllWithCards(PageRequest.of(page, size));
 
         List<UserDto> dtos = users.stream()
                 .map(userMapper::toDto)

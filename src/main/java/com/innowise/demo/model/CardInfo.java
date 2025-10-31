@@ -12,7 +12,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-import org.springframework.data.redis.core.RedisHash;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
 import lombok.Getter;

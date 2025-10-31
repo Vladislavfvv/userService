@@ -33,4 +33,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailNativeQuery(@Param("email") String email);
 
     Page<User> findAll(Pageable pageable);
+    //ну или так для решения проблемы ленивой инициализации:
+//    @Query("SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.cards")
+//    Page<User> findAllWithCards(Pageable pageable);
 }

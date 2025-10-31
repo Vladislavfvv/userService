@@ -14,7 +14,6 @@ import jakarta.persistence.NamedQuery;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
-import org.springframework.data.redis.core.RedisHash;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import lombok.Getter;
