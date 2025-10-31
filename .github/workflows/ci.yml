@@ -53,6 +53,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # для полного клонирования
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -94,7 +96,7 @@ jobs:
                 -Dsonar.organization=vladislavfvv \
                 -Dsonar.projectKey=Vladislavfvv_userService \
                 -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-                -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+                -Dsonar.token=${{ secrets.SONAR_TOKEN }}
 
   docker-build:
     needs: build-test-analyze
