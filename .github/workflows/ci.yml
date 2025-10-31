@@ -95,7 +95,6 @@ jobs:
                 -Dsonar.projectKey=Vladislavfvv_userService \
                 -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
                 -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-                -e
 
   docker-build:
     needs: build-test-analyze
