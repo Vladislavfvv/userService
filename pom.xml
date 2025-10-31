@@ -175,12 +175,15 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <parameters>true</parameters>
+                    <compilerArgs>
+                        <arg>-implicit:class</arg>
+                    </compilerArgs>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>${lombok.version}</version>
-                            <!--<version>1.18.30</version>-->
 
                         </path>
                         <path>
@@ -197,10 +200,15 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
             <!-- Sonar -->
+<!--            <plugin>-->
+<!--                <groupId>org.sonarsource.scanner.maven</groupId>-->
+<!--                <artifactId>sonar-maven-plugin</artifactId>-->
+<!--                <version>3.9.1.2184</version>-->
+<!--            </plugin>-->
             <plugin>
                 <groupId>org.sonarsource.scanner.maven</groupId>
                 <artifactId>sonar-maven-plugin</artifactId>
-                <version>3.9.1.2184</version>
+                <version>3.10.0.2594</version> <!-- Последняя стабильная версия -->
             </plugin>
             <!-- Unit Tests -->
             <plugin>
@@ -210,6 +218,7 @@
                 <configuration>
                     <useModulePath>false</useModulePath>
                     <reportFormat>plain</reportFormat>
+
                 </configuration>
             </plugin>
             <!-- Integration Tests -->
@@ -225,11 +234,6 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.sonarsource.scanner.maven</groupId>
-                <artifactId>sonar-maven-plugin</artifactId>
-                <version>3.10.0.2594</version> <!-- Последняя стабильная версия -->
             </plugin>
         </plugins>
     </build>

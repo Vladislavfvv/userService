@@ -6,8 +6,6 @@ import com.innowise.demo.model.CardInfo;
 
 public interface CardInfoRepository extends JpaRepository<CardInfo, Long> {
 
-    /// ///////////////////////
-
 // JPQL-запрос
     @Query("SELECT COUNT(c) FROM CardInfo c WHERE c.user.id = :userId")
     long countCardsByUserId(Long userId);
