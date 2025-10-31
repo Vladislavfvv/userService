@@ -77,7 +77,6 @@ public class UserService {
     public PagedUserResponse findAllUsers(int page, int size) {
         System.out.println("Получаем из БД (а не из кэша)");
         Page<User> users = userRepository.findAll(PageRequest.of(page, size));
-        //Page<User> users = userRepository.findAllWithCards(PageRequest.of(page, size));
 
         List<UserDto> dtos = users.stream()
                 .map(userMapper::toDto)
