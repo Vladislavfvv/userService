@@ -10,22 +10,20 @@ import java.util.stream.Collectors;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.model.CardInfo;
 import com.innowise.demo.model.User;
 
-import lombok.RequiredArgsConstructor;
-
 @Mapper(componentModel = "spring", uses = {CardInfoMapper.class})
-@RequiredArgsConstructor
-public abstract class UserMapper {
 
+public abstract class UserMapper {
+    @Autowired
     protected CardInfoMapper cardInfoMapper;
 
     @Mapping(target = "cards", source = "cards") // НЕ игнорируем cards — пусть маппятся через CardInfoMapper
     public abstract User toEntity(UserDto dto);
-
 
 
     @Mapping(target = "cards", source = "cards", qualifiedByName = "mapCardListToDto")
