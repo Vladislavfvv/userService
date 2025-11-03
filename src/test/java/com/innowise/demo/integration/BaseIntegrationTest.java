@@ -10,11 +10,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.containers.wait.strategy.Wait;
 
-@Testcontainers
 @SpringBootTest(properties = {
         "spring.cache.type=none"
 })
@@ -22,74 +19,35 @@ public abstract class BaseIntegrationTest {
     private static final boolean USE_TESTCONTAINERS =
             !"false".equalsIgnoreCase(System.getenv().getOrDefault("USE_TESTCONTAINERS", "true"));
 
-    @Container
-    static PostgreSQLContainer<?> postgres = USE_TESTCONTAINERS
-            ? new PostgreSQLContainer<>("postgres:16")
-                .withDatabaseName("testdb")
-                .withUsername("test")
-                .withPassword("test")
-                .withStartupAttempts(3)
-            : null;
+    static PostgreSQLContainer<?> postgres;
+    static GenericContainer<?> redis;
 
-    @Container
-    static GenericContainer<?> redis = USE_TESTCONTAINERS
-            ? new GenericContainer<>("redis:7.2")
-                .withExposedPorts(6379)
-                .waitingFor(Wait.forListeningPort())
-            : null;
+    static {
+        // Создаём и стартуем контейнеры только если USE_TESTCONTAINERS=true
+        if (USE_TESTCONTAINERS) {
+            postgres = new PostgreSQLContainer<>("postgres:16")
+                    .withDatabaseName("testdb")
+                    .withUsername("test")
+                    .withPassword("test")
+                    .withStartupAttempts(3);
+            postgres.start();
 
-//    @Container
-//    static GenericContainer<?> redis = new GenericContainer<>("redis:7.2")
-//            .withExposedPorts(6379);
+            redis = new GenericContainer<>("redis:7.2")
+                    .withExposedPorts(6379)
+                    .waitingFor(Wait.forListeningPort());
+            redis.start();
 
-//    @DynamicPropertySource
-//    static void configureProperties(DynamicPropertyRegistry registry) {
-////        // Создаем схему userservice_data
-////        try (Connection conn = DriverManager.getConnection(
-////                postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-////             Statement stmt = conn.createStatement()) {
-////            stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
-////        } catch (SQLException e) {
-////            throw new RuntimeException(e);
-////        }
-//
-//        // Настройки Spring для Postgres
-////        registry.add("spring.datasource.url",
-////                () -> postgres.getJdbcUrl() + "?currentSchema=userservice_data");
-//        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-//        registry.add("spring.datasource.username", postgres::getUsername);
-//        registry.add("spring.datasource.password", postgres::getPassword);
-//
-//        registry.add("spring.liquibase.enabled", () -> "false");
-//
-//        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-//     //   registry.add("spring.liquibase.default-schema", () -> "userservice_data");
-//      //  registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
-//
-
-    /// /        registry.add("spring.data.redis.host", redis::getHost);
-    /// /        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
-//    }
-//    @DynamicPropertySource
-//    static void configureProperties(DynamicPropertyRegistry registry) {
-//        // Создаем схему
-//        try (Connection conn = DriverManager.getConnection(
-//                postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-//             Statement stmt = conn.createStatement()) {
-//            stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
-//        } catch (SQLException e) {
-//            throw new RuntimeException(e);
-//        }
-//
-//        registry.add("spring.datasource.url",
-//                () -> postgres.getJdbcUrl() + "?currentSchema=userservice_data");
-//        registry.add("spring.datasource.username", postgres::getUsername);
-//        registry.add("spring.datasource.password", postgres::getPassword);
-//
-//        registry.add("spring.liquibase.enabled", () -> "false");
-//        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-//        registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
-//    }
+            // Закрываем контейнеры при завершении JVM
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                if (redis != null) {
+                    redis.stop();
+                }
+                if (postgres != null) {
+                    postgres.stop();
+                }
+            }));
+        }
+    }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
