@@ -59,6 +59,7 @@ pgdata/
 postgres-data/
 data/
 db/
+**/.env
 
 # SQLite / H2
 *.db

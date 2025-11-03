@@ -1,13 +1,12 @@
-version: '3.8'
 services:
   postgres:
     image: postgres:16
     container_name: us_db_pg
     restart: always
     environment:
-      POSTGRES_DB: us_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -16,10 +15,11 @@ services:
     networks:
       - backend-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d us_db"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
 
   redis:
     image: redis:latest

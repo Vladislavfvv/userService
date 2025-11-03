@@ -108,7 +108,7 @@ class UserServiceTest {
         when(userMapper.toDto(user)).thenReturn(userDto);
 
         //when
-        UserDto result = userService.getUserByEmailNamed("masha@gmail.com");
+        UserDto result = userService.getUserByEmail("masha@gmail.com");
 
         //then
         assertNotNull(result);
@@ -118,12 +118,12 @@ class UserServiceTest {
 
     @DisplayName("getUserByEmailNamed_Test_Negative")
     @Test
-    void findUserByEmailNamed_UserNotFound_ThrowsException() {
+    void findUserByEmail_UserNotFound_ThrowsException() {
         // given
         when(userRepository.findByEmailNamed("masha@gmail.com")).thenReturn(Optional.empty());
 
         // when & then
-        assertThrows(UserNotFoundException.class, () -> userService.getUserByEmailNamed("masha@gmail.com"));
+        assertThrows(UserNotFoundException.class, () -> userService.getUserByEmail("masha@gmail.com"));
     }
 
     // ----------------- createUser -----------------

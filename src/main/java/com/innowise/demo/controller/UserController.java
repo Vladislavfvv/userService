@@ -19,7 +19,7 @@ import com.innowise.demo.service.UserService;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
@@ -41,23 +41,10 @@ public class UserController {
         return ResponseEntity.ok(userService.findAllUsers(page, size));
     }
 
-
     //find user by email named
-    @GetMapping("/email/named/{email}")
-    public  ResponseEntity<UserDto> getUserByEmailNamed(@PathVariable String email) {
-         return ResponseEntity.ok(userService.getUserByEmailNamed(email));
-    }
-
-    //find user by email named
-    @GetMapping("/email/jpql/{email}")
-    public ResponseEntity<UserDto> getUserByEmailJSQL(@PathVariable String email) {
-        return ResponseEntity.ok(userService.getUserByEmailJPQl(email));
-    }
-
-    //find user by email named
-    @GetMapping("/email/native/{email}")
-    public ResponseEntity<UserDto> getUserByEmailNative(@PathVariable String email) {
-        return ResponseEntity.ok(userService.getUserByEmailNative(email));
+    @GetMapping("/email")
+    public  ResponseEntity<UserDto> getUserByEmail(@RequestParam(required = false) String email) {
+         return ResponseEntity.ok(userService.getUserByEmail(email));
     }
 
     @PutMapping("/{id}")

@@ -20,7 +20,7 @@ import com.innowise.demo.service.CardInfoService;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/cards")
+@RequestMapping("/api/v1/cards")
 @RequiredArgsConstructor
 public class CardInfoController {
     private final CardInfoService cardInfoService;

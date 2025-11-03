@@ -94,7 +94,7 @@ public class UserService {
     // get by email
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
-    public UserDto getUserByEmailNamed(String email) {
+    public UserDto getUserByEmail(String email) {
         long start = System.currentTimeMillis();
         System.out.println("Загружаем пользователя из БД, email=" + email);
         System.out.println("Время: " + (System.currentTimeMillis() - start) + " мс");
