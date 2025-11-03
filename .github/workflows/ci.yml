@@ -95,7 +95,7 @@ jobs:
         if: always()
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-#          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
           mvn -B -e sonar:sonar -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
 
