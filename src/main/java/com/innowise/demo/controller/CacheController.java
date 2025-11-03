@@ -50,7 +50,7 @@ public class CacheController {
             return Map.of(
                     "key", key,
                     "found", false,
-                    "MESSAGE_KEY", "Значение не найдено в кэше"
+                    MESSAGE_KEY, "Значение не найдено в кэше"
             );
         }
         log.info(" [CACHE] Получено значение по ключу '{}'", key);
@@ -71,7 +71,7 @@ public class CacheController {
             log.info(" [CACHE] Кэш уже пуст.");
             return Map.of(
                     "cleared", false,
-                    "MESSAGE_KEY", "Кэш уже пуст."
+                    MESSAGE_KEY, "Кэш уже пуст."
             );
         }
 
@@ -81,7 +81,7 @@ public class CacheController {
         return Map.of(
                 "cleared", true,
                 "deletedKeysCount", keys.size(),
-                "MESSAGE_KEY", "Кэш успешно очищен."
+                MESSAGE_KEY, "Кэш успешно очищен."
         );
     }
 }

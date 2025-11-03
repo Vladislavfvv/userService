@@ -31,6 +31,7 @@ public class CardInfoService {
     private static final String ALL_CARDS_CACHE = "allCards"; // кеш всех карт
 
     private static final String NOT_FOUND_SUFFIX = " not found";
+    private static final String PREFIX_CARDINFO_WITH_ID = "CardInfo with id ";
 
     @CachePut(value = CARD_CACHE, key = "#result.id")
     @CacheEvict(value = ALL_CARDS_CACHE, allEntries = true)
@@ -50,7 +51,7 @@ public class CardInfoService {
     @Cacheable(value = CARD_CACHE, key = "#id")
     public CardInfoDto getCardInfoById(Long id) {
         CardInfo cardInfo = cardInfoRepository.findById(id)
-                .orElseThrow(() -> new CardInfoNotFoundException("CardInfo with id " + id + NOT_FOUND_SUFFIX));
+                .orElseThrow(() -> new CardInfoNotFoundException(PREFIX_CARDINFO_WITH_ID + id + NOT_FOUND_SUFFIX));
         return cardInfoMapper.toDto(cardInfo);
     }
 
@@ -72,7 +73,7 @@ public class CardInfoService {
     @Transactional
     public CardInfoDto updateCardInfo(Long id, CardInfoDto dto) {
         CardInfo existing = cardInfoRepository.findById(id)
-                .orElseThrow(() -> new CardInfoNotFoundException("CardInfo with id " + id + NOT_FOUND_SUFFIX));
+                .orElseThrow(() -> new CardInfoNotFoundException(PREFIX_CARDINFO_WITH_ID + id + NOT_FOUND_SUFFIX));
 
         existing .setNumber(dto.getNumber());
         existing .setHolder(dto.getHolder());
@@ -91,7 +92,7 @@ public class CardInfoService {
     public void deleteCardInfo(Long id) {
         cardInfoRepository.findById(id)
                 .orElseThrow(
-                        () -> new CardInfoNotFoundException("CardInfo with id " + id + NOT_FOUND_SUFFIX));
+                        () -> new CardInfoNotFoundException(PREFIX_CARDINFO_WITH_ID + id + NOT_FOUND_SUFFIX));
 
         cardInfoRepository.deleteById(id);
 
