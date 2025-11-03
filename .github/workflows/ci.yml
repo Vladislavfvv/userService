@@ -86,17 +86,24 @@ jobs:
       - name: Build and Test with Maven
         run: mvn clean verify -Dspring.profiles.active=local
 
+      - name: Generate JaCoCo report
+        run: mvn jacoco:report  #  генерируем отчет
+
       - name: Run SonarQube Analysis
         if: always()
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+#          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          mvn -B -e sonar:sonar \
-                -Dsonar.organization=vladislavfvv \
-                -Dsonar.projectKey=Vladislavfvv_userService \
-                -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-                -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+          mvn -B -e sonar:sonar \               
+              -Dsonar.organization=vladislavfvv \
+              -Dsonar.projectKey=Vladislavfvv_userService \
+              -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+              -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+              -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+              -Dsonar.sources=src/main/java \
+              -Dsonar.tests=src/test/java \
+              -Dsonar.java.binaries=target/classes
 
   docker-build:
     needs: build-test-analyze

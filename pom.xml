@@ -33,10 +33,7 @@
         <moskito.version>5.6.0</moskito.version>
         <testcontainers.version>1.20.3</testcontainers.version>
         <testcontainers.redis.version>2.2.4</testcontainers.redis.version>
-
-        <sonar.organization>your-organization-name</sonar.organization>
-        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <sonar.projectKey>UserService</sonar.projectKey>
+        <jacoco.version>0.8.10</jacoco.version>
     </properties>
     <dependencies>
 
@@ -212,6 +209,26 @@
                     <reportFormat>plain</reportFormat>
 
                 </configuration>
+            </plugin>
+            <plugin>
+                <!-- JaCoCo для coverage reports -->
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <!-- Integration Tests -->
             <plugin>
