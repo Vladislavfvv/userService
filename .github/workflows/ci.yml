@@ -97,7 +97,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          mvn -B -e sonar:sonar -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+          mvn -B -e sonar:sonar -Dsonar.token=${{ secrets.SONAR_TOKEN }} 
 
   docker-build:
     needs: build-test-analyze
