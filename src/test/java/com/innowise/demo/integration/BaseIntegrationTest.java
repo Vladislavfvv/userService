@@ -12,16 +12,25 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
 @SpringBootTest(properties = {
-        "spring.cache.type=none" // По  выключаем redis
+        "spring.cache.type=none"
 })
 public abstract class BaseIntegrationTest {
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-            .withDatabaseName("testdb")
-            .withUsername("test")
-            .withPassword("test");
+    private static final boolean USE_TESTCONTAINERS =
+            !"true".equalsIgnoreCase(System.getenv("CI"))
+                    && !"false".equalsIgnoreCase(System.getenv().getOrDefault("USE_TESTCONTAINERS", "true"));
+
+    static PostgreSQLContainer<?> postgres;
+
+    static {
+        if (USE_TESTCONTAINERS) {
+            postgres = new PostgreSQLContainer<>("postgres:16")
+                    .withDatabaseName("testdb")
+                    .withUsername("test")
+                    .withPassword("test");
+            postgres.start();
+        }
+    }
 
 //    @Container
 //    static GenericContainer<?> redis = new GenericContainer<>("redis:7.2")
@@ -78,7 +87,10 @@ public abstract class BaseIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        // Создаем схему
+        if (!USE_TESTCONTAINERS) {
+            return; // В CI используем БД из GitHub Actions services через переменные окружения
+        }
+
         try (Connection conn = DriverManager.getConnection(
                 postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
              Statement stmt = conn.createStatement()) {
