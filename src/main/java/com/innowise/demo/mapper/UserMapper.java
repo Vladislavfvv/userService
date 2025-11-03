@@ -31,10 +31,10 @@ public abstract class UserMapper {
 
     @Named("mapCardListToDto")
     protected List<CardInfoDto> mapCardListToDto(List<CardInfo> cards) {
-        if (cards == null) return null;
+        if (cards == null) return new ArrayList<>();
         return cards.stream()
                 .map(cardInfoMapper::toDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**

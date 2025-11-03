@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
+import com.innowise.demo.exception.UserAlreadyExistsException;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.UserMapper;
 import com.innowise.demo.model.CardInfo;
@@ -33,6 +34,11 @@ public class UserService {
     private final UserMapper userMapper;
     private final CardInfoRepository cardInfoRepository;
 
+    private static final String NOT_FOUND_SUFFIX = " not found!";
+    private static final String USER_WITH_EMAIL = "User with email ";
+    private static final String PREFIX_WITH_ID = "User with id ";
+
+
     @CachePut(key = "#result.id")
     @CacheEvict(value = "users_all", allEntries = true) // очищаем кэш списка
     public UserDto createUser(UserDto dto) {
@@ -43,7 +49,7 @@ public class UserService {
 
         // Проверка на уникальность email
         if (userRepository.findByEmailNativeQuery(dto.getEmail()).isPresent()) {
-            throw new RuntimeException("User with email " + dto.getEmail() + " already exists");
+            throw new UserAlreadyExistsException(USER_WITH_EMAIL + dto.getEmail() + " already exists");
         }
 
         // Создаём сущность пользователя
@@ -64,10 +70,9 @@ public class UserService {
     @Cacheable(key = "#id")
     @Transactional(readOnly = true)
     public UserDto findUserById(Long id) {
-        System.out.println("Загружаем пользователя из БД, id=" + id);
         User user = userRepository.findById(id)
                 .orElseThrow(
-                        () -> new UserNotFoundException("User with id " + id + " not found!"));
+                        () -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
 
         return userMapper.toDto(user);
     }
@@ -75,7 +80,6 @@ public class UserService {
     @Cacheable(value = "users_all", key = "'page_' + #page + '_size_' + #size")
     @Transactional(readOnly = true)//длф решения проблемы ленивой инициализации
     public PagedUserResponse findAllUsers(int page, int size) {
-        System.out.println("Получаем из БД (а не из кэша)");
         Page<User> users = userRepository.findAll(PageRequest.of(page, size));
 
         List<UserDto> dtos = users.stream()
@@ -95,11 +99,8 @@ public class UserService {
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmail(String email) {
-        long start = System.currentTimeMillis();
-        System.out.println("Загружаем пользователя из БД, email=" + email);
-        System.out.println("Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findByEmailNamed(email)
-                .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
+                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + email + NOT_FOUND_SUFFIX));
 
         return userMapper.toDto(user);
     }
@@ -108,11 +109,8 @@ public class UserService {
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmailJPQl(String email) {
-        long start = System.currentTimeMillis();
-        System.out.println("Загружаем пользователя из БД, email=" + email);
-        System.out.println("Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findByEmailJPQL(email)
-                .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
+                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + email + NOT_FOUND_SUFFIX));
 
         return userMapper.toDto(user);
     }
@@ -121,11 +119,8 @@ public class UserService {
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmailNative(String email) {
-        long start = System.currentTimeMillis();
-        System.out.println("Загружаем пользователя из БД, email=" + email);
-        System.out.println("Время: " + (System.currentTimeMillis() - start) + " мс");
         User user = userRepository.findByEmailNativeQuery(email)
-                .orElseThrow(() -> new UserNotFoundException("User with email " + email + " not found!"));
+                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + email + NOT_FOUND_SUFFIX));
 
         return userMapper.toDto(user);
     }
@@ -135,7 +130,7 @@ public class UserService {
     @Transactional
     public UserDto updateUser(Long id, UserDto dto) {
         User existUser = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("User with id " + id + " not found!"));
+                .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
 
         // Обновляем простые поля
         existUser.setName(dto.getName());
@@ -181,8 +176,8 @@ public class UserService {
     @CachePut(key = "#id")
     @Transactional
     public void deleteUser(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
+        userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
 
         userRepository.deleteById(id);
     }

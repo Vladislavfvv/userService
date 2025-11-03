@@ -91,7 +91,7 @@ class UserServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
         // when & then // сам вызов метода, который мы тестируем, ожидаем выброс исключения UserNotFoundException
         UserNotFoundException exception = assertThrows(UserNotFoundException.class, () -> userService.findUserById(userId));
-        // assertThrows(UserNotFoundException.class, () -> userService.findUserById(userId));
+
         //проверить текст сообщения исключения
         assertEquals("User with id " + userId + " not found!", exception.getMessage());
         // verify: проверяем, что мок был вызван ровно один раз с нужным аргументом

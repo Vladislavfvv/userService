@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class CacheController {
     private final RedisTemplate<String, Object> redisTemplate;
-
+    private static final String MESSAGE_KEY = "message";
     /**
      * Получить список всех ключей, которые сейчас хранятся в Redis.
      */
@@ -50,7 +50,7 @@ public class CacheController {
             return Map.of(
                     "key", key,
                     "found", false,
-                    "message", "Значение не найдено в кэше"
+                    "MESSAGE_KEY", "Значение не найдено в кэше"
             );
         }
         log.info(" [CACHE] Получено значение по ключу '{}'", key);
@@ -71,7 +71,7 @@ public class CacheController {
             log.info(" [CACHE] Кэш уже пуст.");
             return Map.of(
                     "cleared", false,
-                    "message", "Кэш уже пуст."
+                    "MESSAGE_KEY", "Кэш уже пуст."
             );
         }
 
@@ -81,7 +81,7 @@ public class CacheController {
         return Map.of(
                 "cleared", true,
                 "deletedKeysCount", keys.size(),
-                "message", "Кэш успешно очищен."
+                "MESSAGE_KEY", "Кэш успешно очищен."
         );
     }
 }

@@ -33,6 +33,7 @@ class DemoApplicationTests {
 
     @Test
     void contextLoads() {
+        // Проверка загрузки контекста Spring Boot. Тест пройден, если контекст стартует без ошибок.
     }
 
 }

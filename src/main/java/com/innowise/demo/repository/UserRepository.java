@@ -14,13 +14,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     User getUserById(Long aLong);
 
-    /**
-     * ADD  methods!!!
-     * @return
-     */
     List<User> getUsersByEmail(String email);
 
-    /// /////////////////////////////////////
     //Используется @NamedQuery из User.java
     Optional<User> findByEmailNamed(@Param("email") String email);
 

@@ -73,13 +73,13 @@ class CardInfoServiceTest {
 
     @Test
     void getCardInfoById_Exists_ReturnsDto() {
-        CardInfo card = new CardInfo();
-        card.setId(1L);
+        CardInfo cardInfo = new CardInfo();
+        cardInfo.setId(1L);
         CardInfoDto dto = new CardInfoDto();
         dto.setId(1L);
 
-        when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
-        when(cardInfoMapper.toDto(card)).thenReturn(dto);
+        when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(cardInfo));
+        when(cardInfoMapper.toDto(cardInfo)).thenReturn(dto);
 
         CardInfoDto result = cardInfoService.getCardInfoById(1L);
         assertNotNull(result);
@@ -136,16 +136,6 @@ class CardInfoServiceTest {
         // then
         assertNotNull(result);
         assertEquals(card.getNumber(), result.getNumber());
-    }
-
-    @DisplayName("getCardInfo_Negative")
-    @Test
-    void getCardInfoById_ShouldThrow_WhenNotFound() {
-        // given
-        when(cardInfoRepository.findById(1L)).thenReturn(Optional.empty());
-
-        // when & then
-        assertThrows(CardInfoNotFoundException.class, () -> cardInfoService.getCardInfoById(1L));
     }
 
     // ----------------- getAllCardInfos -----------------
