@@ -41,7 +41,6 @@ public class UserService {
 
     @CachePut(key = "#result.id")
     @CacheEvict(value = "users_all", allEntries = true) // очищаем кэш списка
-    @Transactional
     public UserDto createUser(UserDto dto) {
         dto.setId(null);
         if (dto.getCards() != null) {
