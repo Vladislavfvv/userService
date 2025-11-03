@@ -1,11 +1,15 @@
 package com.innowise.demo.integration;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.LocalDate;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.redis.core.RedisTemplate;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.exception.CardInfoNotFoundException;
@@ -15,43 +19,15 @@ import com.innowise.demo.repository.CardInfoRepository;
 import com.innowise.demo.repository.UserRepository;
 import com.innowise.demo.service.CardInfoService;
 import com.innowise.demo.service.UserService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.Page;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@SpringBootTest(properties = {
-        "spring.cache.type=none"
-})//временно отключить кэширование (для интеграционных тестов, где кэш не тестируется) это заставит Spring использовать NoOpCacheManager
-@Testcontainers
+
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class CardInfoServiceIT {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-            .withDatabaseName("testdb")
-            .withUsername("test")
-            .withPassword("test");
-
-    @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7.2")
-            .withExposedPorts(6379);
+class CardInfoServiceIT extends BaseIntegrationTest{
 
     @Autowired
     private CardInfoService cardInfoService;
@@ -74,31 +50,6 @@ class CardInfoServiceIT {
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
-@DynamicPropertySource
-static void setProperties(DynamicPropertyRegistry registry) {
-    // Создаем схему userservice_data в контейнере PostgreSQL
-    try (Connection conn = DriverManager.getConnection(
-            postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-         Statement stmt = conn.createStatement()) {
-        stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
-    } catch (SQLException e) {
-        throw new RuntimeException(e);
-    }
-
-    // Указываем Spring использовать нашу схему
-    registry.add("spring.datasource.url",
-            () -> postgres.getJdbcUrl() + "?currentSchema=userservice_data"); // <- поменял здесь
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-
-    registry.add("spring.liquibase.default-schema", () -> "userservice_data"); // <- добавил
-    registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data"); // <- добавил
-
-    registry.add("spring.data.redis.host", redis::getHost);
-    registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
-}
-
-    private UserDto userDto;
     private CardInfoDto cardDto;
 
     @BeforeEach
@@ -106,7 +57,7 @@ static void setProperties(DynamicPropertyRegistry registry) {
         cardInfoRepository.deleteAll();
         userRepository.deleteAll();
 
-        userDto = new UserDto();
+        UserDto userDto = new UserDto();
         userDto.setName("Integration");
         userDto.setSurname("CardTest");
         userDto.setEmail("carduser@example.com");
