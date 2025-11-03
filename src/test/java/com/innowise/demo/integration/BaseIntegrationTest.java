@@ -19,17 +19,24 @@ import org.testcontainers.containers.wait.strategy.Wait;
         "spring.cache.type=none"
 })
 public abstract class BaseIntegrationTest {
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-            .withDatabaseName("testdb")
-            .withUsername("test")
-            .withPassword("test")
-            .withStartupAttempts(3);
+    private static final boolean USE_TESTCONTAINERS =
+            !"false".equalsIgnoreCase(System.getenv().getOrDefault("USE_TESTCONTAINERS", "true"));
 
     @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7.2")
-            .withExposedPorts(6379)
-            .waitingFor(Wait.forListeningPort());
+    static PostgreSQLContainer<?> postgres = USE_TESTCONTAINERS
+            ? new PostgreSQLContainer<>("postgres:16")
+                .withDatabaseName("testdb")
+                .withUsername("test")
+                .withPassword("test")
+                .withStartupAttempts(3)
+            : null;
+
+    @Container
+    static GenericContainer<?> redis = USE_TESTCONTAINERS
+            ? new GenericContainer<>("redis:7.2")
+                .withExposedPorts(6379)
+                .waitingFor(Wait.forListeningPort())
+            : null;
 
 //    @Container
 //    static GenericContainer<?> redis = new GenericContainer<>("redis:7.2")
@@ -86,34 +93,37 @@ public abstract class BaseIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        try (Connection conn = DriverManager.getConnection(
-                postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
+        if (USE_TESTCONTAINERS) {
+            try (Connection conn = DriverManager.getConnection(
+                    postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+                 Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+
+            registry.add("spring.datasource.url",
+                    () -> postgres.getJdbcUrl() + "?currentSchema=userservice_data");
+            registry.add("spring.datasource.username", postgres::getUsername);
+            registry.add("spring.datasource.password", postgres::getPassword);
+
+            registry.add("spring.liquibase.enabled", () -> "false");
+            registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
+
+            // Hikari: более короткий lifecycle для тестов, чтобы не было WARN на shutdown
+            registry.add("spring.datasource.hikari.max-lifetime", () -> "30000");
+            registry.add("spring.datasource.hikari.idle-timeout", () -> "10000");
+            registry.add("spring.datasource.hikari.minimum-idle", () -> "0");
+            registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
+
+            // Снижаем уровень логов Hikari в тестах, чтобы скрыть шумные WARN на shutdown
+            registry.add("logging.level.com.zaxxer.hikari", () -> "ERROR");
+
+            // Redis (Testcontainers)
+            registry.add("spring.data.redis.host", redis::getHost);
+            registry.add("spring.data.redis.port", () -> String.valueOf(redis.getMappedPort(6379)));
         }
-
-        registry.add("spring.datasource.url",
-                () -> postgres.getJdbcUrl() + "?currentSchema=userservice_data");
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-
-        registry.add("spring.liquibase.enabled", () -> "false");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-        registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
-
-        // Hikari: более короткий lifecycle для тестов, чтобы не было WARN на shutdown
-        registry.add("spring.datasource.hikari.max-lifetime", () -> "30000");
-        registry.add("spring.datasource.hikari.idle-timeout", () -> "10000");
-        registry.add("spring.datasource.hikari.minimum-idle", () -> "0");
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
-
-        // Снижаем уровень логов Hikari в тестах, чтобы скрыть шумные WARN на shutdown
-        registry.add("logging.level.com.zaxxer.hikari", () -> "ERROR");
-
-        // Redis (Testcontainers)
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", () -> String.valueOf(redis.getMappedPort(6379)));
+        // else: используем окружение CI (services postgres/redis), ничего не переопределяем
     }
 }

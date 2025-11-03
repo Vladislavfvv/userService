@@ -15,13 +15,41 @@ jobs:
   build-test-analyze:
     runs-on: ubuntu-latest
 
-    # Testcontainers сам поднимет Postgres/Redis при необходимости
+    # Поднимаем сервисы БД и Redis (используем их в CI, Testcontainers отключаем)
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: us_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d us_db"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7.2
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
 
     env:
       SPRING_PROFILES_ACTIVE: test
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/us_db?currentSchema=userservice_data
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_REDIS_HOST: localhost
+      SPRING_REDIS_PORT: 6379
+      USE_TESTCONTAINERS: false
       MAVEN_OPTS: -Xmx1024m
-      TESTCONTAINERS_RYUK_DISABLED: true
-      TESTCONTAINERS_CHECKS_DISABLE: true
 
     steps:
       - name: Checkout code
