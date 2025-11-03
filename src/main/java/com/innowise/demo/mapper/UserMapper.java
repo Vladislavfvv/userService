@@ -19,10 +19,10 @@ import com.innowise.demo.model.User;
 @Mapper(componentModel = "spring", uses = {CardInfoMapper.class})
 
 public abstract class UserMapper {
-    @Autowired
+
     protected CardInfoMapper cardInfoMapper;
 
-    @Mapping(target = "cards", source = "cards") // НЕ игнорируем cards — пусть маппятся через CardInfoMapper
+    @Mapping(target = "cards", source = "cards")
     public abstract User toEntity(UserDto dto);
 
 

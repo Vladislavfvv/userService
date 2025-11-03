@@ -41,6 +41,7 @@ public class UserService {
 
     @CachePut(key = "#result.id")
     @CacheEvict(value = "users_all", allEntries = true) // очищаем кэш списка
+    @Transactional
     public UserDto createUser(UserDto dto) {
         dto.setId(null);
         if (dto.getCards() != null) {
@@ -132,7 +133,6 @@ public class UserService {
         User existUser = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
 
-        // Обновляем простые поля
         existUser.setName(dto.getName());
         existUser.setSurname(dto.getSurname());
         existUser.setBirthDate(dto.getBirthDate());

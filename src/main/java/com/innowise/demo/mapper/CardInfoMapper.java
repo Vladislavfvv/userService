@@ -8,12 +8,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.model.CardInfo;
 import com.innowise.demo.model.User;
+import com.innowise.demo.repository.CardInfoRepository;
 import com.innowise.demo.repository.UserRepository;
 
 @Mapper(componentModel = "spring")
 
 public abstract class CardInfoMapper {
-    @Autowired
+
     protected UserRepository userRepository;
 
     @Mapping(target = "userId", source = "user.id")
@@ -35,13 +36,13 @@ public abstract class CardInfoMapper {
         return entity;
     }
 
-    /**
-     * Вспомогательный метод для поиска User по id (для CardInfoDto.userId)
-     */
-    public User mapUser(Long userId) {
-        if (userId == null) return null;
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User with id " + userId + " not found"));
-    }
+//    /**
+//     * Вспомогательный метод для поиска User по id (для CardInfoDto.userId)
+//     */
+//    public User mapUser(Long userId) {
+//        if (userId == null) return null;
+//        return userRepository.findById(userId)
+//                .orElseThrow(() -> new EntityNotFoundException("User with id " + userId + " not found"));
+//    }
 }
 

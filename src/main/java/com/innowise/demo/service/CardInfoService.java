@@ -78,8 +78,11 @@ public class CardInfoService {
         existing .setNumber(dto.getNumber());
         existing .setHolder(dto.getHolder());
         existing .setExpirationDate(dto.getExpirationDate());
-        if (dto.getUserId() != null && (existing.getUser() == null || !existing.getUser().getId().equals(dto.getUserId()))) {
-            existing.setUser(cardInfoMapper.mapUser(dto.getUserId()));
+        if (dto.getUserId() != null
+            && (existing.getUser() == null || !existing.getUser().getId().equals(dto.getUserId()))) {
+            User user = userRepository.findById(dto.getId())
+                    .orElseThrow(() -> new UserNotFoundException("User not found with id: " + dto.getId()));
+            existing.setUser(user);
         }
         return cardInfoMapper.toDto(cardInfoRepository.save(existing));
     }
