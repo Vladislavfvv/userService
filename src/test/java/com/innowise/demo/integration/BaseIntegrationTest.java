@@ -81,7 +81,42 @@ public abstract class BaseIntegrationTest {
             // Redis (Testcontainers)
             registry.add("spring.data.redis.host", redis::getHost);
             registry.add("spring.data.redis.port", () -> String.valueOf(redis.getMappedPort(6379)));
+        } else {
+            // CI: используем сервисы GitHub Actions (postgres/redis) и создаём схему вручную
+            String pgHost = System.getenv().getOrDefault("POSTGRES_HOST", "localhost");
+            String pgPort = System.getenv().getOrDefault("POSTGRES_PORT", "5432");
+            String pgDb = System.getenv().getOrDefault("POSTGRES_DB", "us_db");
+            String pgUser = System.getenv().getOrDefault("POSTGRES_USER", "postgres");
+            String pgPass = System.getenv().getOrDefault("POSTGRES_PASSWORD", "postgres");
+
+            String baseUrl = "jdbc:postgresql://" + pgHost + ":" + pgPort + "/" + pgDb;
+
+            try (Connection conn = DriverManager.getConnection(baseUrl, pgUser, pgPass);
+                 Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+
+            registry.add("spring.datasource.url", () -> baseUrl + "?currentSchema=userservice_data");
+            registry.add("spring.datasource.username", () -> pgUser);
+            registry.add("spring.datasource.password", () -> pgPass);
+
+            registry.add("spring.liquibase.enabled", () -> "false");
+            registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
+
+            // Hikari в CI
+            registry.add("spring.datasource.hikari.max-lifetime", () -> "30000");
+            registry.add("spring.datasource.hikari.idle-timeout", () -> "10000");
+            registry.add("spring.datasource.hikari.minimum-idle", () -> "0");
+            registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
+
+            // Redis (services)
+            String redisHost = System.getenv().getOrDefault("REDIS_HOST", "localhost");
+            String redisPort = System.getenv().getOrDefault("REDIS_PORT", "6379");
+            registry.add("spring.data.redis.host", () -> redisHost);
+            registry.add("spring.data.redis.port", () -> redisPort);
         }
-        // else: используем окружение CI (services postgres/redis), ничего не переопределяем
     }
 }
