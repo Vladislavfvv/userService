@@ -20,6 +20,8 @@ jobs:
     env:
       SPRING_PROFILES_ACTIVE: test
       MAVEN_OPTS: -Xmx1024m
+      TESTCONTAINERS_RYUK_DISABLED: true
+      TESTCONTAINERS_CHECKS_DISABLE: true
 
     steps:
       - name: Checkout code
