@@ -9,68 +9,55 @@ import java.util.stream.Collectors;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.Named;
-import org.springframework.beans.factory.annotation.Autowired;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.model.CardInfo;
 import com.innowise.demo.model.User;
 
 @Mapper(componentModel = "spring", uses = {CardInfoMapper.class})
+public interface UserMapper {
 
-public abstract class UserMapper {
+	@Mapping(target = "cards", source = "cards")
+	User toEntity(UserDto dto);
 
-    protected CardInfoMapper cardInfoMapper;
+	@Mapping(target = "cards", source = "cards")
+	UserDto toDto(User user);
 
-    @Mapping(target = "cards", source = "cards")
-    public abstract User toEntity(UserDto dto);
+	/**
+	 * Обновление списка карт без зависимости от других мапперов.
+	 */
+	default List<CardInfo> updateCards(User user, List<CardInfoDto> cardDtos) {
+		if (cardDtos == null || cardDtos.isEmpty()) {
+			return new ArrayList<>();
+		}
 
+		Map<Long, CardInfo> existingCardsMap = Optional.ofNullable(user.getCards())
+				.orElse(Collections.emptyList())
+				.stream()
+				.filter(c -> c.getId() != null)
+				.collect(Collectors.toMap(CardInfo::getId, c -> c));
 
-    @Mapping(target = "cards", source = "cards", qualifiedByName = "mapCardListToDto")
-    public abstract UserDto toDto(User user);
+		List<CardInfo> updatedCards = new ArrayList<>();
 
-    @Named("mapCardListToDto")
-    protected List<CardInfoDto> mapCardListToDto(List<CardInfo> cards) {
-        if (cards == null) return new ArrayList<>();
-        return cards.stream()
-                .map(cardInfoMapper::toDto)
-                .toList();
-    }
+		for (CardInfoDto dto : cardDtos) {
+			if (dto.getId() != null && existingCardsMap.containsKey(dto.getId())) {
+				CardInfo existingCard = existingCardsMap.get(dto.getId());
+				existingCard.setNumber(dto.getNumber());
+				existingCard.setHolder(dto.getHolder());
+				existingCard.setExpirationDate(dto.getExpirationDate());
+				updatedCards.add(existingCard);
+			} else {
+				CardInfo newCard = new CardInfo();
+				newCard.setId(dto.getId());
+				newCard.setNumber(dto.getNumber());
+				newCard.setHolder(dto.getHolder());
+				newCard.setExpirationDate(dto.getExpirationDate());
+				newCard.setUser(user);
+				updatedCards.add(newCard);
+			}
+		}
 
-    /**
-     * Вспомогательный метод для обновления списка карт пользователя.
-     * Используется внутри UserService.updateUser.
-     */
-    public List<CardInfo> updateCards(User user, List<CardInfoDto> cardDtos) {
-        if (cardDtos == null || cardDtos.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        Map<Long, CardInfo> existingCardsMap = Optional.ofNullable(user.getCards())
-                .orElse(Collections.emptyList())
-                .stream()
-                .filter(c -> c.getId() != null)
-                .collect(Collectors.toMap(CardInfo::getId, c -> c));
-
-        List<CardInfo> updatedCards = new ArrayList<>();
-
-        for (CardInfoDto dto : cardDtos) {
-            if (dto.getId() != null && existingCardsMap.containsKey(dto.getId())) {
-                // обновляем существующую карту
-                CardInfo existingCard = existingCardsMap.get(dto.getId());
-                existingCard.setNumber(dto.getNumber());
-                existingCard.setHolder(dto.getHolder());
-                existingCard.setExpirationDate(dto.getExpirationDate());
-                updatedCards.add(existingCard);
-            } else {
-                // создаём новую карту
-                CardInfo newCard = cardInfoMapper.toEntity(dto);
-                newCard.setUser(user);
-                updatedCards.add(newCard);
-            }
-        }
-
-        return updatedCards;
-    }
+		return updatedCards;
+	}
 }
 

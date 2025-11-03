@@ -15,39 +15,10 @@ jobs:
   build-test-analyze:
     runs-on: ubuntu-latest
 
-    # Поднимаем сервисы БД и Redis
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: us_db
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d us_db"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=5
-
-      redis:
-        image: redis:7.2
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=5
+    # Testcontainers сам поднимет Postgres/Redis при необходимости
 
     env:
-      SPRING_PROFILES_ACTIVE: local
-      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/us_db?currentSchema=userservice_data
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_REDIS_HOST: localhost
-      SPRING_REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: test
       MAVEN_OPTS: -Xmx1024m
 
     steps:
@@ -66,30 +37,12 @@ jobs:
       - name: Clear Maven cache
         run: mvn dependency:purge-local-repository
 
-      - name: Verify DB availability
-        run: |
-          echo "Waiting for PostgreSQL to be ready..."
-          for i in {1..30}; do
-            pg_isready -h localhost -p 5432 -U postgres && echo "Postgres ready" && break
-            sleep 2           
-          done
-
-      - name: Create schema userservice_data (if not exists)
-        env:
-          PGPASSWORD: postgres
-        run: |
-          # устанавливаем psql (ubuntu runner) и создаем схему, если нужно
-          sudo apt-get update -y
-          sudo apt-get install -y postgresql-client
-          psql -h localhost -U postgres -d us_db -c "CREATE SCHEMA IF NOT EXISTS userservice_data;"
+      # Нет ручного старта БД: Testcontainers управляет инфраструктурой
 
 #      - name: Build and Test with Maven
 #        run: mvn clean verify -Dspring.profiles.active=local
       - name: Build and Test with Maven
-        run: mvn clean verify -Dspring.profiles.active=test -Dtest=!DemoApplicationTests
-
-      - name: Generate JaCoCo report
-        run: mvn jacoco:report  #  генерируем отчет
+        run: mvn -B -T1C clean verify -Dspring.profiles.active=test -Dtest=!DemoApplicationTests
 
       - name: Run SonarQube Analysis
         if: always()

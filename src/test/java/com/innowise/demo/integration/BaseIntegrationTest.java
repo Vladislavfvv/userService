@@ -12,25 +12,16 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+@Testcontainers
 @SpringBootTest(properties = {
         "spring.cache.type=none"
 })
 public abstract class BaseIntegrationTest {
-    private static final boolean USE_TESTCONTAINERS =
-            !"true".equalsIgnoreCase(System.getenv("CI"))
-                    && !"false".equalsIgnoreCase(System.getenv().getOrDefault("USE_TESTCONTAINERS", "true"));
-
-    static PostgreSQLContainer<?> postgres;
-
-    static {
-        if (USE_TESTCONTAINERS) {
-            postgres = new PostgreSQLContainer<>("postgres:16")
-                    .withDatabaseName("testdb")
-                    .withUsername("test")
-                    .withPassword("test");
-            postgres.start();
-        }
-    }
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
+            .withDatabaseName("testdb")
+            .withUsername("test")
+            .withPassword("test");
 
 //    @Container
 //    static GenericContainer<?> redis = new GenericContainer<>("redis:7.2")
@@ -87,10 +78,6 @@ public abstract class BaseIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        if (!USE_TESTCONTAINERS) {
-            return; // В CI используем БД из GitHub Actions services через переменные окружения
-        }
-
         try (Connection conn = DriverManager.getConnection(
                 postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
              Statement stmt = conn.createStatement()) {
@@ -107,5 +94,14 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.liquibase.enabled", () -> "false");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
         registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
+
+        // Hikari: более короткий lifecycle для тестов, чтобы не было WARN на shutdown
+        registry.add("spring.datasource.hikari.max-lifetime", () -> "30000");
+        registry.add("spring.datasource.hikari.idle-timeout", () -> "10000");
+        registry.add("spring.datasource.hikari.minimum-idle", () -> "0");
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
+
+        // Снижаем уровень логов Hikari в тестах, чтобы скрыть шумные WARN на shutdown
+        registry.add("logging.level.com.zaxxer.hikari", () -> "ERROR");
     }
 }
