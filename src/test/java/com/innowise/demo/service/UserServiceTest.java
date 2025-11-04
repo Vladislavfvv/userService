@@ -288,4 +288,115 @@ class UserServiceTest {
         // when & then
         assertThrows(UserNotFoundException.class, () -> userService.deleteUser(1L));
     }
+
+    // ----------------- getUserByEmailJPQL -----------------
+
+    @DisplayName("getUserByEmailJPQL_Positive")
+    @Test
+    void getUserByEmailJPQL_UserExists_ReturnsDto() {
+        // given
+        when(userRepository.findByEmailJPQL("masha@gmail.com")).thenReturn(Optional.of(user));
+        when(userMapper.toDto(user)).thenReturn(userDto);
+
+        // when
+        UserDto result = userService.getUserByEmailJPQl("masha@gmail.com");
+
+        // then
+        assertNotNull(result);
+        assertEquals("masha@gmail.com", result.getEmail());
+        verify(userRepository, times(1)).findByEmailJPQL("masha@gmail.com");
+    }
+
+    @DisplayName("getUserByEmailJPQL_Negative")
+    @Test
+    void getUserByEmailJPQL_UserNotFound_ThrowsException() {
+        // given
+        when(userRepository.findByEmailJPQL("notfound@gmail.com")).thenReturn(Optional.empty());
+
+        // when & then
+        assertThrows(UserNotFoundException.class, () -> userService.getUserByEmailJPQl("notfound@gmail.com"));
+    }
+
+    // ----------------- getUserByEmailNative -----------------
+
+    @DisplayName("getUserByEmailNative_Positive")
+    @Test
+    void getUserByEmailNative_UserExists_ReturnsDto() {
+        // given
+        when(userRepository.findByEmailNativeQuery("masha@gmail.com")).thenReturn(Optional.of(user));
+        when(userMapper.toDto(user)).thenReturn(userDto);
+
+        // when
+        UserDto result = userService.getUserByEmailNative("masha@gmail.com");
+
+        // then
+        assertNotNull(result);
+        assertEquals("masha@gmail.com", result.getEmail());
+        verify(userRepository, times(1)).findByEmailNativeQuery("masha@gmail.com");
+    }
+
+    @DisplayName("getUserByEmailNative_Negative")
+    @Test
+    void getUserByEmailNative_UserNotFound_ThrowsException() {
+        // given
+        when(userRepository.findByEmailNativeQuery("notfound@gmail.com")).thenReturn(Optional.empty());
+
+        // when & then
+        assertThrows(UserNotFoundException.class, () -> userService.getUserByEmailNative("notfound@gmail.com"));
+    }
+
+    // ----------------- updateUser with cards -----------------
+
+    @DisplayName("updateUser_WithCards_ShouldUpdateCards")
+    @Test
+    void updateUser_WithCards_ShouldUpdateCards() {
+        // given
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        user.setCards(new ArrayList<>()); // пустой список карт
+
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            UserDto dto = new UserDto();
+            dto.setId(u.getId());
+            dto.setName(u.getName());
+            dto.setSurname(u.getSurname());
+            dto.setEmail(u.getEmail());
+            dto.setBirthDate(u.getBirthDate());
+            return dto;
+        });
+
+        UserDto updateDto = new UserDto();
+        updateDto.setName("Ivan");
+        updateDto.setSurname("Vanusha");
+        updateDto.setEmail("Vanusha@example.com");
+        updateDto.setBirthDate(LocalDate.of(2000, 1, 1));
+        updateDto.setCards(null); // null карты
+
+        // when
+        UserDto result = userService.updateUser(1L, updateDto);
+
+        // then
+        assertNotNull(result);
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    // ----------------- findAllUsers edge cases -----------------
+
+    @DisplayName("findAllUsers_EmptyPage_ShouldReturnEmpty")
+    @Test
+    void findAllUsers_EmptyPage_ShouldReturnEmpty() {
+        // given
+        Page<User> emptyPage = new PageImpl<>(List.of(), PageRequest.of(0, 5), 0);
+        when(userRepository.findAll(PageRequest.of(0, 5))).thenReturn(emptyPage);
+
+        // when
+        PagedUserResponse response = userService.findAllUsers(0, 5);
+
+        // then
+        assertNotNull(response);
+        assertEquals(0, response.getContent().size());
+        assertEquals(0L, response.getTotalElements());
+        verify(userRepository, times(1)).findAll(PageRequest.of(0, 5));
+    }
 }

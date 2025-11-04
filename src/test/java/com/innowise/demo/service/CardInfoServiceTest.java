@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -231,6 +232,112 @@ class CardInfoServiceTest {
 
         // when & then
         assertThrows(CardInfoNotFoundException.class, () -> cardInfoService.deleteCardInfo(1L));
+    }
+
+    // ----------------- updateCardInfo with userId change -----------------
+
+    @DisplayName("updateCardInfo_WithDifferentUserId_ShouldUpdateUser")
+    @Test
+    void updateCardInfo_WithDifferentUserId_ShouldUpdateUser() {
+        // given
+        User newUser = new User();
+        newUser.setId(2L);
+
+        when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(newUser));
+
+        when(cardInfoRepository.save(any(CardInfo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(cardInfoMapper.toDto(any(CardInfo.class))).thenAnswer(invocation -> {
+            CardInfo c = invocation.getArgument(0);
+            CardInfoDto dto = new CardInfoDto();
+            dto.setId(c.getId());
+            dto.setNumber(c.getNumber());
+            dto.setHolder(c.getHolder());
+            dto.setExpirationDate(c.getExpirationDate());
+            dto.setUserId(c.getUser().getId());
+            return dto;
+        });
+
+        CardInfoDto updateDto = new CardInfoDto();
+        updateDto.setNumber("9999 8888 7777 6666");
+        updateDto.setHolder("Updated Holder");
+        updateDto.setExpirationDate(LocalDate.of(2035, 1, 1));
+        updateDto.setUserId(2L); // новый userId
+
+        // when
+        CardInfoDto result = cardInfoService.updateCardInfo(1L, updateDto);
+
+        // then
+        assertNotNull(result);
+        assertEquals(2L, result.getUserId());
+        verify(cardInfoRepository, times(1)).save(any(CardInfo.class));
+        verify(userRepository, times(1)).findById(2L);
+    }
+
+    @DisplayName("updateCardInfo_WithSameUserId_ShouldNotUpdateUser")
+    @Test
+    void updateCardInfo_WithSameUserId_ShouldNotUpdateUser() {
+        // given
+        when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
+        when(cardInfoRepository.save(any(CardInfo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(cardInfoMapper.toDto(any(CardInfo.class))).thenAnswer(invocation -> {
+            CardInfo c = invocation.getArgument(0);
+            CardInfoDto dto = new CardInfoDto();
+            dto.setId(c.getId());
+            dto.setNumber(c.getNumber());
+            dto.setHolder(c.getHolder());
+            dto.setExpirationDate(c.getExpirationDate());
+            dto.setUserId(c.getUser().getId());
+            return dto;
+        });
+
+        CardInfoDto updateDto = new CardInfoDto();
+        updateDto.setNumber("9999 8888 7777 6666");
+        updateDto.setHolder("Updated Holder");
+        updateDto.setExpirationDate(LocalDate.of(2035, 1, 1));
+        updateDto.setUserId(1L); // тот же userId
+
+        // when
+        CardInfoDto result = cardInfoService.updateCardInfo(1L, updateDto);
+
+        // then
+        assertNotNull(result);
+        assertEquals(1L, result.getUserId());
+        verify(cardInfoRepository, times(1)).save(any(CardInfo.class));
+        // userRepository.findById не должен вызываться, если userId не изменился
+        verify(userRepository, never()).findById(any());
+    }
+
+    @DisplayName("updateCardInfo_WithNullUserId_ShouldNotUpdateUser")
+    @Test
+    void updateCardInfo_WithNullUserId_ShouldNotUpdateUser() {
+        // given
+        when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
+        when(cardInfoRepository.save(any(CardInfo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(cardInfoMapper.toDto(any(CardInfo.class))).thenAnswer(invocation -> {
+            CardInfo c = invocation.getArgument(0);
+            CardInfoDto dto = new CardInfoDto();
+            dto.setId(c.getId());
+            dto.setNumber(c.getNumber());
+            dto.setHolder(c.getHolder());
+            dto.setExpirationDate(c.getExpirationDate());
+            dto.setUserId(c.getUser() != null ? c.getUser().getId() : null);
+            return dto;
+        });
+
+        CardInfoDto updateDto = new CardInfoDto();
+        updateDto.setNumber("9999 8888 7777 6666");
+        updateDto.setHolder("Updated Holder");
+        updateDto.setExpirationDate(LocalDate.of(2035, 1, 1));
+        updateDto.setUserId(null); // null userId
+
+        // when
+        CardInfoDto result = cardInfoService.updateCardInfo(1L, updateDto);
+
+        // then
+        assertNotNull(result);
+        verify(cardInfoRepository, times(1)).save(any(CardInfo.class));
+        verify(userRepository, never()).findById(any());
     }
 
 }
