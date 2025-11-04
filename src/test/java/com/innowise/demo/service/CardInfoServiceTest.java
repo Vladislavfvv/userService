@@ -174,7 +174,6 @@ class CardInfoServiceTest {
         // given
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        //when(cardInfoMapper.mapUser(user.getId())).thenReturn(user);
 
         // Мок save просто возвращает объект, который передаем
         //save через thenAnswer возвращает объект, который реально был передан, чтобы имитировать сохранение
@@ -304,7 +303,7 @@ class CardInfoServiceTest {
         assertNotNull(result);
         assertEquals(1L, result.getUserId());
         verify(cardInfoRepository, times(1)).save(any(CardInfo.class));
-        // userRepository.findById не должен вызываться, если userId не изменился
+        //не должен вызываться, если userId не изменился userRepository.findById
         verify(userRepository, never()).findById(any());
     }
 

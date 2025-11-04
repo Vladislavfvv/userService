@@ -38,7 +38,6 @@ class CardInfoControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
     private CardInfoService cardInfoService;
 
     private CardInfoDto cardInfoDto;
