@@ -172,7 +172,7 @@ class CardInfoServiceTest {
     void updateCardInfo_ShouldReturnUpdatedDto() {
         // given
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
-        when(cardInfoMapper.mapUser(user.getId())).thenReturn(user);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
         // Мок save просто возвращает объект, который передаем
         //save через thenAnswer возвращает объект, который реально был передан, чтобы имитировать сохранение
