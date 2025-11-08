@@ -3,6 +3,8 @@ package com.innowise.demo.controller;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,8 +20,10 @@ import com.innowise.demo.service.UserService;
 
 import lombok.RequiredArgsConstructor;
 
+import java.util.Collection;
+
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping({"/api/v1/users", "/api/users"})
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
@@ -34,11 +38,32 @@ public class UserController {
         return ResponseEntity.ok(userService.findUserById(id));
     }
 
+    /**
+     * Получение всех пользователей с проверкой ролей из Keycloak токена.
+     * ROLE_ADMIN - может видеть всех пользователей
+     * ROLE_USER - может видеть только своих пользователей (логику нужно добавить)
+     */
     @GetMapping
     public ResponseEntity<PagedUserResponse> getUsers(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size) {
-        return ResponseEntity.ok(userService.findAllUsers(page, size));
+            @RequestParam(defaultValue = "5") int size,
+            Authentication authentication) {
+        
+        // Получить роли из Keycloak токена
+        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
+        
+        // Проверить роль
+        boolean isAdmin = authorities.stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (isAdmin) {
+            // Администратор видит всех пользователей
+            return ResponseEntity.ok(userService.findAllUsers(page, size));
+        } else {
+            // Обычный пользователь - можно добавить логику фильтрации по своему email
+            // Например: userService.findUsersByEmail(authentication.getName(), page, size);
+            return ResponseEntity.ok(userService.findAllUsers(page, size));
+        }
     }
 
     //find user by email named
