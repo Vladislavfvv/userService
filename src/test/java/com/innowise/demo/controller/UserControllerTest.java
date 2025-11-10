@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
+import com.innowise.demo.dto.UserUpdateRequest;
 import com.innowise.demo.exception.UserAlreadyExistsException;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.service.UserService;
@@ -214,7 +215,8 @@ class UserControllerTest {
     @DisplayName("PUT /api/v1/users/1 - успешное обновление пользователя")
     void updateUser_ShouldReturnUpdatedUser() throws Exception {
         // given
-        UserDto updateDto = new UserDto();
+        UserUpdateRequest updateDto = new UserUpdateRequest();
+        updateDto.setUserId(1L);
         updateDto.setName("Updated");
         updateDto.setSurname("User");
         updateDto.setEmail("updated@example.com");
@@ -227,7 +229,7 @@ class UserControllerTest {
         updatedDto.setEmail("updated@example.com");
         updatedDto.setBirthDate(LocalDate.of(1995, 5, 5));
 
-        when(userService.updateUser(eq(1L), any(UserDto.class))).thenReturn(updatedDto);
+        when(userService.updateUser(eq(1L), any(UserUpdateRequest.class))).thenReturn(updatedDto);
 
         // when & then
         mockMvc.perform(put("/api/v1/users/1")
@@ -243,13 +245,14 @@ class UserControllerTest {
     @DisplayName("PUT /api/v1/users/999 - пользователь не найден для обновления")
     void updateUser_ShouldReturnNotFound_WhenUserNotFound() throws Exception {
         // given
-        UserDto updateDto = new UserDto();
+        UserUpdateRequest updateDto = new UserUpdateRequest();
+        updateDto.setUserId(999L);
         updateDto.setName("Updated");
         updateDto.setSurname("User");
         updateDto.setEmail("updated@example.com");
         updateDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
-        when(userService.updateUser(eq(999L), any(UserDto.class)))
+        when(userService.updateUser(eq(999L), any(UserUpdateRequest.class)))
                 .thenThrow(new UserNotFoundException("User with id 999 not found!"));
 
         // when & then
@@ -263,7 +266,8 @@ class UserControllerTest {
     @DisplayName("PUT /api/v1/users/1 - валидация: некорректный email")
     void updateUser_ShouldReturnBadRequest_WhenEmailInvalid() throws Exception {
         // given
-        UserDto invalidDto = new UserDto();
+        UserUpdateRequest invalidDto = new UserUpdateRequest();
+        invalidDto.setUserId(1L);
         invalidDto.setName("Test");
         invalidDto.setEmail("invalid-email"); // невалидный email
 

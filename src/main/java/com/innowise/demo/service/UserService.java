@@ -11,9 +11,17 @@ import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
@@ -24,6 +32,7 @@ import com.innowise.demo.model.CardInfo;
 import com.innowise.demo.model.User;
 import com.innowise.demo.repository.CardInfoRepository;
 import com.innowise.demo.repository.UserRepository;
+import com.innowise.demo.dto.UserUpdateRequest;
 
 import lombok.RequiredArgsConstructor;
 
@@ -49,9 +58,12 @@ public class UserService {
             dto.getCards().forEach(c -> c.setId(null));
         }
 
+        String normalizedEmail = normalizeEmail(dto.getEmail());
+        dto.setEmail(normalizedEmail);
+
         // Проверка на уникальность email
-        if (userRepository.findByEmailNativeQuery(dto.getEmail()).isPresent()) {
-            throw new UserAlreadyExistsException(USER_WITH_EMAIL + dto.getEmail() + " already exists");
+        if (userRepository.findByEmailNativeQuery(normalizedEmail).isPresent()) {
+            throw new UserAlreadyExistsException(USER_WITH_EMAIL + normalizedEmail + " already exists");
         }
 
         // Создаём сущность пользователя
@@ -69,7 +81,7 @@ public class UserService {
     }
 
     //get by id
-    @PreAuthorize("@accessManager.canAccessUser(#id, authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN','USER')")
     @Cacheable(key = "#id")
     @Transactional(readOnly = true)
     public UserDto findUserById(Long id) {
@@ -77,6 +89,7 @@ public class UserService {
                 .orElseThrow(
                         () -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
 
+        ensureCurrentUserCanAccessUser(user, requireAuthentication());
         return userMapper.toDto(user);
     }
 
@@ -99,51 +112,103 @@ public class UserService {
         );
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','USER')")
+    @Transactional
+    public UserDto getCurrentUser(Authentication authentication) {
+        Authentication auth = authentication != null ? authentication : requireAuthentication();
+        String identifier = resolveCurrentUserIdentifier(auth);
+        String normalizedIdentifier = normalizeEmail(identifier);
+        User user = userRepository.findByEmailNamed(normalizedIdentifier)
+                .orElseGet(() -> autoProvisionUser(auth, normalizedIdentifier));
+        if (user.getCards() != null) {
+            user.getCards().size();
+        }
+        ensureCurrentUserCanAccessUser(user, auth);
+        return userMapper.toDto(user);
+    }
+
     // get by email
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','USER')")
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmail(String email) {
-        User user = userRepository.findByEmailNamed(email)
-                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + email + NOT_FOUND_SUFFIX));
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findByEmailNamed(normalizedEmail)
+                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + normalizedEmail + NOT_FOUND_SUFFIX));
 
+        ensureCurrentUserCanAccessUser(user, requireAuthentication());
         return userMapper.toDto(user);
     }
 
     // get by email JPQL
-    @PreAuthorize("@accessManager.canAccessUserByEmail(#email, authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN','USER')")
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmailJPQl(String email) {
-        User user = userRepository.findByEmailJPQL(email)
-                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + email + NOT_FOUND_SUFFIX));
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findByEmailJPQL(normalizedEmail)
+                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + normalizedEmail + NOT_FOUND_SUFFIX));
 
+        ensureCurrentUserCanAccessUser(user, requireAuthentication());
         return userMapper.toDto(user);
     }
 
     // get by email Native
-    @PreAuthorize("@accessManager.canAccessUserByEmail(#email, authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN','USER')")
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmailNative(String email) {
-        User user = userRepository.findByEmailNativeQuery(email)
-                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + email + NOT_FOUND_SUFFIX));
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findByEmailNativeQuery(normalizedEmail)
+                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + normalizedEmail + NOT_FOUND_SUFFIX));
 
+        ensureCurrentUserCanAccessUser(user, requireAuthentication());
         return userMapper.toDto(user);
     }
 
-    @PreAuthorize("@accessManager.canAccessUser(#id, authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN','USER')")
     @CachePut(key = "#id")
     @CacheEvict(value = "users_all", allEntries = true)
     @Transactional
-    public UserDto updateUser(Long id, UserDto dto) {
+    public UserDto updateUser(Long id, UserUpdateRequest dto) {
         User existUser = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
 
-        existUser.setName(dto.getName());
-        existUser.setSurname(dto.getSurname());
-        existUser.setBirthDate(dto.getBirthDate());
-        existUser.setEmail(dto.getEmail());
+        ensureCurrentUserCanAccessUser(existUser, requireAuthentication());
+
+        if (dto.getUserId() != null && !dto.getUserId().equals(id)) {
+            throw new AccessDeniedException("Cannot update another user");
+        }
+
+        if (dto.getName() != null) {
+            if (dto.getName().isBlank()) {
+                throw new AccessDeniedException("Name must not be blank");
+            }
+            existUser.setName(dto.getName());
+        }
+
+        if (dto.getSurname() != null) {
+            if (dto.getSurname().isBlank()) {
+                throw new AccessDeniedException("Surname must not be blank");
+            }
+            existUser.setSurname(dto.getSurname());
+        }
+
+        if (dto.getBirthDate() != null) {
+            existUser.setBirthDate(dto.getBirthDate());
+        }
+
+        if (dto.getEmail() != null) {
+            if (dto.getEmail().isBlank()) {
+                throw new AccessDeniedException("Email must not be blank");
+            }
+            String normalizedEmail = normalizeEmail(dto.getEmail());
+        if (!normalizedEmail.equalsIgnoreCase(existUser.getEmail())
+                    && userRepository.findByEmailNativeQuery(normalizedEmail).isPresent()) {
+                throw new UserAlreadyExistsException(USER_WITH_EMAIL + normalizedEmail + " already exists");
+            }
+            existUser.setEmail(normalizedEmail);
+        }
 
         if (dto.getCards() != null) {
             Map<Long, CardInfo> existingCardsMap = existUser.getCards().stream()
@@ -153,6 +218,12 @@ public class UserService {
             List<CardInfo> updatedCards = new ArrayList<>();
 
             for (CardInfoDto cardDto : dto.getCards()) {
+                Long ownerId = cardDto.getUserId() != null ? cardDto.getUserId() : id;
+                if (!ownerId.equals(id)) {
+                    throw new AccessDeniedException("Cannot assign card to another user");
+                }
+                cardDto.setUserId(id);
+
                 if (cardDto.getId() != null && existingCardsMap.containsKey(cardDto.getId())) {
                     // Существующая карта — обновляем поля
                     CardInfo existingCard = existingCardsMap.get(cardDto.getId());
@@ -179,14 +250,100 @@ public class UserService {
         return userMapper.toDto(userRepository.save(existUser));
     }
 
-    @PreAuthorize("@accessManager.canAccessUser(#id, authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN','USER')")
     @CacheEvict(value = "users_all", allEntries = true)
     @CachePut(key = "#id")
     @Transactional
     public void deleteUser(Long id) {
-        userRepository.findById(id)
+        User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
 
+        ensureCurrentUserCanAccessUser(user, requireAuthentication());
         userRepository.deleteById(id);
+    }
+
+    private Authentication requireAuthentication() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        return authentication;
+    }
+
+    private void ensureCurrentUserCanAccessUser(User user, Authentication authentication) {
+        if (isAdmin(authentication)) {
+            return;
+        }
+        if (user == null) {
+            throw new AccessDeniedException("Access denied");
+        }
+        String currentIdentifier = resolveCurrentUserIdentifier(authentication);
+        String userEmail = user.getEmail();
+        if (userEmail == null || !userEmail.equalsIgnoreCase(currentIdentifier)) {
+            throw new AccessDeniedException("Access denied");
+        }
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_ADMIN"::equals);
+    }
+
+    private String resolveCurrentUserIdentifier(Authentication authentication) {
+        if (authentication instanceof JwtAuthenticationToken jwtAuthenticationToken) {
+            Jwt jwt = jwtAuthenticationToken.getToken();
+            String email = jwt.getClaimAsString("email");
+            if (email != null && !email.isBlank()) {
+                return normalizeEmail(email);
+            }
+            String preferredUsername = jwt.getClaimAsString("preferred_username");
+            if (preferredUsername != null && !preferredUsername.isBlank()) {
+                return normalizeEmail(preferredUsername);
+            }
+            String subject = jwt.getSubject();
+            if (subject != null && !subject.isBlank()) {
+                return normalizeEmail(subject);
+            }
+        }
+
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserDetails userDetails) {
+            return normalizeEmail(userDetails.getUsername());
+        }
+
+        String name = authentication.getName();
+        if (name != null && !name.isBlank()) {
+            return normalizeEmail(name);
+        }
+
+        throw new AccessDeniedException("Cannot determine current user");
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected User autoProvisionUser(Authentication authentication, String email) {
+        User user = new User();
+        user.setEmail(normalizeEmail(email));
+
+        if (authentication instanceof JwtAuthenticationToken jwtAuthenticationToken) {
+            Jwt jwt = jwtAuthenticationToken.getToken();
+            String givenName = jwt.getClaimAsString("given_name");
+            String familyName = jwt.getClaimAsString("family_name");
+            if (givenName != null && !givenName.isBlank()) {
+                user.setName(givenName);
+            }
+            if (familyName != null && !familyName.isBlank()) {
+                user.setSurname(familyName);
+            }
+        }
+
+        return userRepository.save(user);
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        return email.trim().toLowerCase();
     }
 }

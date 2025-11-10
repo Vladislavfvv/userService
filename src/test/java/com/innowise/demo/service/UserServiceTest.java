@@ -3,11 +3,13 @@ package com.innowise.demo.service;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -15,8 +17,12 @@ import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
+import com.innowise.demo.dto.UserUpdateRequest;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.UserMapper;
 import com.innowise.demo.model.User;
@@ -64,6 +70,21 @@ class UserServiceTest {
         userDto.setSurname("Raspberry");
         userDto.setEmail("masha@gmail.com");
         userDto.setBirthDate(LocalDate.of(1990, 1, 1));
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private void authenticateAsUser(String email) {
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        email,
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 
     // ----------------- findByIdUser -----------------
@@ -245,11 +266,16 @@ class UserServiceTest {
             return dto;
         });
 
-        UserDto updateDto = new UserDto();
+        UserUpdateRequest updateDto = new UserUpdateRequest();
+        updateDto.setUserId(1L);
         updateDto.setName("Ivan");
         updateDto.setSurname("Vanusha");
         updateDto.setEmail("Vanusha@example.com");
         updateDto.setBirthDate(LocalDate.of(2000,1,1));
+
+        when(userRepository.findByEmailNativeQuery("Vanusha@example.com")).thenReturn(Optional.empty());
+
+        authenticateAsUser("masha@gmail.com");
 
         // when
         UserDto result = userService.updateUser(1L, updateDto);
@@ -261,6 +287,37 @@ class UserServiceTest {
         assertEquals("Vanusha@example.com", result.getEmail());
         assertEquals(LocalDate.of(2000,1,1), result.getBirthDate());
 
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @DisplayName("getCurrentUser_ShouldProvisionUser_WhenNotExists")
+    @Test
+    void getCurrentUser_ShouldProvisionUser_WhenNotExists() {
+        String email = "newuser@example.com";
+        authenticateAsUser(email);
+        when(userRepository.findByEmailNativeQuery(email)).thenReturn(Optional.empty());
+        when(userRepository.findByEmailNamed(email)).thenReturn(Optional.empty());
+
+        when(userRepository.findByEmailNamed(email)).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User saved = invocation.getArgument(0);
+            saved.setId(10L);
+            return saved;
+        });
+        when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
+            User saved = invocation.getArgument(0);
+            UserDto dto = new UserDto();
+            dto.setId(saved.getId());
+            dto.setEmail(saved.getEmail());
+            dto.setName(saved.getName());
+            dto.setSurname(saved.getSurname());
+            return dto;
+        });
+
+        UserDto current = userService.getCurrentUser(SecurityContextHolder.getContext().getAuthentication());
+
+        assertNotNull(current);
+        assertEquals(email, current.getEmail());
         verify(userRepository, times(1)).save(any(User.class));
     }
 
@@ -366,12 +423,17 @@ class UserServiceTest {
             return dto;
         });
 
-        UserDto updateDto = new UserDto();
+        UserUpdateRequest updateDto = new UserUpdateRequest();
+        updateDto.setUserId(1L);
         updateDto.setName("Ivan");
         updateDto.setSurname("Vanusha");
         updateDto.setEmail("Vanusha@example.com");
         updateDto.setBirthDate(LocalDate.of(2000, 1, 1));
-        updateDto.setCards(null); // null карты
+        updateDto.setCards(Collections.emptyList());
+
+        when(userRepository.findByEmailNativeQuery("Vanusha@example.com")).thenReturn(Optional.empty());
+
+        authenticateAsUser("masha@gmail.com");
 
         // when
         UserDto result = userService.updateUser(1L, updateDto);

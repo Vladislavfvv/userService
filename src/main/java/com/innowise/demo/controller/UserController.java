@@ -20,10 +20,12 @@ import com.innowise.demo.client.AuthServiceClient;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.service.UserService;
+import com.innowise.demo.dto.UserUpdateRequest;
 
 import lombok.RequiredArgsConstructor;
 
 import java.util.Collection;
+import java.util.List;
 
 @RestController
 @RequestMapping({"/api/v1/users", "/api/users"})
@@ -64,10 +66,21 @@ public class UserController {
             // Администратор видит всех пользователей
             return ResponseEntity.ok(userService.findAllUsers(page, size));
         } else {
-            // Обычный пользователь - можно добавить логику фильтрации по email
-            // Например как вариант: userService.findUsersByEmail(authentication.getName(), page, size);
-            return ResponseEntity.ok(userService.findAllUsers(page, size));
+            UserDto currentUser = userService.getCurrentUser(authentication);
+            PagedUserResponse response = new PagedUserResponse(
+                    List.of(currentUser),
+                    0,
+                    1,
+                    1,
+                    1
+            );
+            return ResponseEntity.ok(response);
         }
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> getCurrentUser(Authentication authentication) {
+        return ResponseEntity.ok(userService.getCurrentUser(authentication));
     }
 
     //find user by email named
@@ -82,7 +95,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserDto> updateUser(@PathVariable Long id, @Valid @RequestBody UserDto dto) {
+    public ResponseEntity<UserDto> updateUser(@PathVariable Long id, @Valid @RequestBody UserUpdateRequest dto) {
         return ResponseEntity.ok(userService.updateUser(id, dto));
     }
 

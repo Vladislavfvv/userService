@@ -9,7 +9,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import com.innowise.demo.dto.UserDto;
+import com.innowise.demo.dto.UserUpdateRequest;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.UserMapper;
 import com.innowise.demo.model.User;
@@ -93,16 +98,27 @@ class UserServiceIT extends BaseIntegrationTest{
     void updateUser_ShouldModifyData() {
         User saved = userRepository.save(userMapper.toEntity(userDto));
 
-        UserDto updateDto = new UserDto();
+        UserUpdateRequest updateDto = new UserUpdateRequest();
+        updateDto.setUserId(saved.getId());
         updateDto.setName("Updated");
         updateDto.setSurname("User");
         updateDto.setEmail("updated@example.com");
         updateDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        saved.getEmail(),
+                        null,
+                        java.util.List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
         UserDto updated = userService.updateUser(saved.getId(), updateDto);
 
         assertEquals("Updated", updated.getName());
         assertEquals("updated@example.com", updated.getEmail());
+
+        SecurityContextHolder.clearContext();
     }
 
     @Test
