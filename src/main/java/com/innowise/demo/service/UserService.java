@@ -11,6 +11,7 @@ import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.innowise.demo.dto.CardInfoDto;
@@ -39,6 +40,7 @@ public class UserService {
     private static final String PREFIX_WITH_ID = "User with id ";
 
 
+    @PreAuthorize("hasRole('ADMIN')")
     @CachePut(key = "#result.id")
     @CacheEvict(value = "users_all", allEntries = true) // очищаем кэш списка
     public UserDto createUser(UserDto dto) {
@@ -67,6 +69,7 @@ public class UserService {
     }
 
     //get by id
+    @PreAuthorize("@accessManager.canAccessUser(#id, authentication)")
     @Cacheable(key = "#id")
     @Transactional(readOnly = true)
     public UserDto findUserById(Long id) {
@@ -77,6 +80,7 @@ public class UserService {
         return userMapper.toDto(user);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @Cacheable(value = "users_all", key = "'page_' + #page + '_size_' + #size")
     @Transactional(readOnly = true)//длф решения проблемы ленивой инициализации
     public PagedUserResponse findAllUsers(int page, int size) {
@@ -96,6 +100,7 @@ public class UserService {
     }
 
     // get by email
+    @PreAuthorize("hasRole('ADMIN')")
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmail(String email) {
@@ -106,6 +111,7 @@ public class UserService {
     }
 
     // get by email JPQL
+    @PreAuthorize("@accessManager.canAccessUserByEmail(#email, authentication)")
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmailJPQl(String email) {
@@ -116,6 +122,7 @@ public class UserService {
     }
 
     // get by email Native
+    @PreAuthorize("@accessManager.canAccessUserByEmail(#email, authentication)")
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmailNative(String email) {
@@ -125,6 +132,7 @@ public class UserService {
         return userMapper.toDto(user);
     }
 
+    @PreAuthorize("@accessManager.canAccessUser(#id, authentication)")
     @CachePut(key = "#id")
     @CacheEvict(value = "users_all", allEntries = true)
     @Transactional
@@ -171,6 +179,7 @@ public class UserService {
         return userMapper.toDto(userRepository.save(existUser));
     }
 
+    @PreAuthorize("@accessManager.canAccessUser(#id, authentication)")
     @CacheEvict(value = "users_all", allEntries = true)
     @CachePut(key = "#id")
     @Transactional

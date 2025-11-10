@@ -3,6 +3,7 @@ package com.innowise.demo.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -15,6 +16,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
  * 1. Получает JWK set из внутреннего адреса Keycloak (доступного из Docker сети)
  * 2. Проверяет issuer вручную (чтобы соответствовал issuer в токене от клиента)
  */
+
+@Profile("keycloak")
 @Configuration
 public class JwtDecoderConfig {
 

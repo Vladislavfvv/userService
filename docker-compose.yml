@@ -52,6 +52,7 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_PROFILES_ACTIVE: docker
+      AUTH_JWT_SECRET: mySecretKeyForJWTGenerationInAuthenticationService2025
     ports:
       - "8082:8080"
     networks:
