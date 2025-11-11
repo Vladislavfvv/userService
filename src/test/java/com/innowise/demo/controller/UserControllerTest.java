@@ -2,16 +2,26 @@ package com.innowise.demo.controller;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innowise.demo.client.AuthServiceClient;
+import com.innowise.demo.client.dto.TokenValidationResponse;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.dto.UserUpdateRequest;
@@ -20,6 +30,7 @@ import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.service.UserService;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -31,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class UserControllerTest {
 
     @Autowired
@@ -42,7 +54,16 @@ class UserControllerTest {
     @MockBean
     private UserService userService;
 
+    @MockBean
+    private AuthServiceClient authServiceClient;
+
     private UserDto userDto;
+    private static final String AUTH_HEADER = "Bearer test-token";
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
 
     @BeforeEach
     void setUp() {
@@ -52,6 +73,32 @@ class UserControllerTest {
         userDto.setSurname("User");
         userDto.setEmail("test@example.com");
         userDto.setBirthDate(LocalDate.of(1990, 1, 1));
+
+        when(authServiceClient.validateAuthorizationHeader(anyString()))
+                .thenReturn(Optional.of(new TokenValidationResponse(true, "test", "ROLE_USER")));
+    }
+
+    private static RequestPostProcessor adminAuth() {
+        TestingAuthenticationToken token =
+                new TestingAuthenticationToken("admin@example.com", "password", "ROLE_ADMIN");
+        return withAuthentication(token);
+    }
+
+    private static RequestPostProcessor userAuth(String email) {
+        TestingAuthenticationToken token =
+                new TestingAuthenticationToken(email, "password", "ROLE_USER");
+        return withAuthentication(token);
+    }
+
+    private static RequestPostProcessor withAuthentication(TestingAuthenticationToken token) {
+        return request -> {
+            token.setAuthenticated(true);
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(token);
+            request.setUserPrincipal(token);
+            request.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+            return request;
+        };
     }
 
     @Test
@@ -68,6 +115,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(post("/api/v1/users")
+                        .with(adminAuth())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestDto)))
                 .andExpect(status().isOk())
@@ -88,6 +136,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(post("/api/v1/users")
+                        .with(adminAuth())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidDto)))
                 .andExpect(status().isBadRequest());
@@ -121,6 +170,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(get("/api/v1/users/id")
+                        .with(adminAuth())
                         .param("id", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1L))
@@ -137,6 +187,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(get("/api/v1/users/id")
+                        .with(adminAuth())
                         .param("id", "999"))
                 .andExpect(status().isNotFound());
     }
@@ -156,6 +207,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(get("/api/v1/users")
+                        .with(adminAuth())
                         .param("page", "0")
                         .param("size", "5"))
                 .andExpect(status().isOk())
@@ -179,7 +231,8 @@ class UserControllerTest {
         when(userService.findAllUsers(0, 5)).thenReturn(pagedResponse);
 
         // when & then
-        mockMvc.perform(get("/api/v1/users"))
+        mockMvc.perform(get("/api/v1/users")
+                        .with(adminAuth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(5));
@@ -193,6 +246,8 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(get("/api/v1/users/email")
+                        .with(userAuth("test@example.com"))
+                        .header("Authorization", AUTH_HEADER)
                         .param("email", "test@example.com"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("test@example.com"));
@@ -207,6 +262,8 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(get("/api/v1/users/email")
+                        .with(userAuth("notfound@example.com"))
+                        .header("Authorization", AUTH_HEADER)
                         .param("email", "notfound@example.com"))
                 .andExpect(status().isNotFound());
     }
@@ -233,6 +290,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(put("/api/v1/users/1")
+                        .with(adminAuth())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDto)))
                 .andExpect(status().isOk())
@@ -257,6 +315,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(put("/api/v1/users/999")
+                        .with(adminAuth())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateDto)))
                 .andExpect(status().isNotFound());
@@ -273,6 +332,7 @@ class UserControllerTest {
 
         // when & then
         mockMvc.perform(put("/api/v1/users/1")
+                        .with(adminAuth())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidDto)))
                 .andExpect(status().isBadRequest());
@@ -285,7 +345,8 @@ class UserControllerTest {
         // when(userService.deleteUser(1L)).thenReturn(null); // void метод
 
         // when & then
-        mockMvc.perform(delete("/api/v1/users/1"))
+        mockMvc.perform(delete("/api/v1/users/1")
+                        .with(adminAuth()))
                 .andExpect(status().isNoContent());
     }
 
@@ -297,7 +358,8 @@ class UserControllerTest {
                 .when(userService).deleteUser(999L);
 
         // when & then
-        mockMvc.perform(delete("/api/v1/users/999"))
+        mockMvc.perform(delete("/api/v1/users/999")
+                        .with(adminAuth()))
                 .andExpect(status().isNotFound());
     }
 }

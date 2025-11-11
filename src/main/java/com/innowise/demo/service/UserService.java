@@ -1,8 +1,12 @@
 package com.innowise.demo.service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheConfig;
@@ -22,6 +26,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
+import com.innowise.demo.client.AuthServiceClient;
+import com.innowise.demo.client.dto.UpdateUserProfileRequest;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
@@ -39,10 +45,12 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 @CacheConfig(cacheNames = "users") // общий префикс для всех методов
+@SuppressWarnings("null")
 public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final CardInfoRepository cardInfoRepository;
+    private final AuthServiceClient authServiceClient;
 
     private static final String NOT_FOUND_SUFFIX = " not found!";
     private static final String USER_WITH_EMAIL = "User with email ";
@@ -176,6 +184,8 @@ public class UserService {
 
         ensureCurrentUserCanAccessUser(existUser, requireAuthentication());
 
+        String previousEmail = existUser.getEmail();
+
         if (dto.getUserId() != null && !dto.getUserId().equals(id)) {
             throw new AccessDeniedException("Cannot update another user");
         }
@@ -211,10 +221,14 @@ public class UserService {
         }
 
         if (dto.getCards() != null) {
-            Map<Long, CardInfo> existingCardsMap = existUser.getCards().stream()
+            Map<Long, CardInfo> existingCardsById = existUser.getCards().stream()
                     .filter(c -> c.getId() != null)
                     .collect(Collectors.toMap(CardInfo::getId, c -> c));
 
+            Map<String, CardInfo> existingCardsBySignature = existUser.getCards().stream()
+                    .collect(Collectors.toMap(this::cardSignature, c -> c, (left, right) -> left, HashMap::new));
+
+            Set<String> seenSignatures = new HashSet<>();
             List<CardInfo> updatedCards = new ArrayList<>();
 
             for (CardInfoDto cardDto : dto.getCards()) {
@@ -224,30 +238,43 @@ public class UserService {
                 }
                 cardDto.setUserId(id);
 
-                if (cardDto.getId() != null && existingCardsMap.containsKey(cardDto.getId())) {
-                    // Существующая карта — обновляем поля
-                    CardInfo existingCard = existingCardsMap.get(cardDto.getId());
+                String signature = cardSignature(cardDto);
+                if (seenSignatures.contains(signature)) {
+                    continue; // skip duplicates in the same request
+                }
+                seenSignatures.add(signature);
+
+                if (cardDto.getId() != null && existingCardsById.containsKey(cardDto.getId())) {
+                    CardInfo existingCard = existingCardsById.get(cardDto.getId());
+                    existingCard.setNumber(cardDto.getNumber());
+                    existingCard.setHolder(cardDto.getHolder());
+                    existingCard.setExpirationDate(cardDto.getExpirationDate());
+                    updatedCards.add(existingCard);
+                    existingCardsBySignature.put(signature, existingCard);
+                } else if (existingCardsBySignature.containsKey(signature)) {
+                    CardInfo existingCard = existingCardsBySignature.get(signature);
                     existingCard.setNumber(cardDto.getNumber());
                     existingCard.setHolder(cardDto.getHolder());
                     existingCard.setExpirationDate(cardDto.getExpirationDate());
                     updatedCards.add(existingCard);
                 } else {
-                    // Новая карта — создаём и привязываем к пользователю
                     CardInfo newCard = new CardInfo();
                     newCard.setNumber(cardDto.getNumber());
                     newCard.setHolder(cardDto.getHolder());
                     newCard.setExpirationDate(cardDto.getExpirationDate());
                     newCard.setUser(existUser);
                     updatedCards.add(newCard);
+                    existingCardsBySignature.put(signature, newCard);
                 }
             }
 
-            // Обновляем коллекцию (Hibernate удалит старые карты, которых нет)
             existUser.getCards().clear();
             existUser.getCards().addAll(updatedCards);
         }
 
-        return userMapper.toDto(userRepository.save(existUser));
+        User saved = userRepository.save(existUser);
+        synchronizeAuthenticationProfile(previousEmail, saved);
+        return userMapper.toDto(saved);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','USER')")
@@ -345,5 +372,39 @@ public class UserService {
             return null;
         }
         return email.trim().toLowerCase();
+    }
+
+    private void synchronizeAuthenticationProfile(String previousEmail, User user) {
+        try {
+            authServiceClient.updateUserProfile(new UpdateUserProfileRequest(
+                    previousEmail == null ? user.getEmail() : previousEmail,
+                    user.getEmail(),
+                    resolveProfileName(user.getName(), user.getEmail()),
+                    resolveProfileName(user.getSurname(), user.getEmail())
+            ));
+        } catch (IllegalStateException ex) {
+            throw ex;
+        }
+    }
+
+    private String resolveProfileName(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        return value;
+    }
+
+    private String cardSignature(CardInfo card) {
+        return cardSignature(card.getNumber(), card.getHolder(), card.getExpirationDate());
+    }
+
+    private String cardSignature(CardInfoDto dto) {
+        return cardSignature(dto.getNumber(), dto.getHolder(), dto.getExpirationDate());
+    }
+
+    private String cardSignature(String number, String holder, LocalDate expirationDate) {
+        return (number == null ? "" : number.trim()) + "|" +
+                (holder == null ? "" : holder.trim()) + "|" +
+                (expirationDate == null ? "" : expirationDate.toString());
     }
 }

@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.innowise.demo.client.AuthServiceClient;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.dto.UserUpdateRequest;
@@ -33,10 +34,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@SuppressWarnings("null")
 class UserServiceTest {
     @InjectMocks
     private UserService userService;
@@ -49,6 +52,9 @@ class UserServiceTest {
 
     @Mock
     private CacheManager cacheManager;
+
+    @Mock
+    private AuthServiceClient authServiceClient;
 
     private User user;
     private UserDto userDto;
@@ -70,6 +76,8 @@ class UserServiceTest {
         userDto.setSurname("Raspberry");
         userDto.setEmail("masha@gmail.com");
         userDto.setBirthDate(LocalDate.of(1990, 1, 1));
+        doNothing().when(authServiceClient).updateUserProfile(any());
+        authenticateAsAdmin();
     }
 
     @AfterEach
@@ -83,6 +91,16 @@ class UserServiceTest {
                         email,
                         null,
                         List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    private void authenticateAsAdmin() {
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        "admin@example.com",
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
                 );
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
@@ -284,7 +302,7 @@ class UserServiceTest {
         assertNotNull(result);
         assertEquals("Ivan", result.getName());
         assertEquals("Vanusha", result.getSurname());
-        assertEquals("Vanusha@example.com", result.getEmail());
+        assertEquals("vanusha@example.com", result.getEmail());
         assertEquals(LocalDate.of(2000,1,1), result.getBirthDate());
 
         verify(userRepository, times(1)).save(any(User.class));

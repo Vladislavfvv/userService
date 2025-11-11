@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -15,20 +16,25 @@ import org.springframework.web.client.RestTemplate;
 
 import com.innowise.demo.client.dto.TokenValidationRequest;
 import com.innowise.demo.client.dto.TokenValidationResponse;
+import com.innowise.demo.client.dto.UpdateUserProfileRequest;
 
 @Component
 public class AuthServiceClient {
 
     private static final Logger log = LoggerFactory.getLogger(AuthServiceClient.class);
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String INTERNAL_API_KEY_HEADER = "X-Internal-Api-Key";
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
+    private final String internalApiKey;
 
     public AuthServiceClient(RestTemplate restTemplate,
-                             @Value("${authentication.service.base-url:http://authentication-service:8081}") String baseUrl) {
+                             @Value("${authentication.service.base-url:http://authentication-service:8081}") String baseUrl,
+                             @Value("${authentication.service.internal-api-key:}") String internalApiKey) {
         this.restTemplate = restTemplate;
         this.baseUrl = baseUrl;
+        this.internalApiKey = internalApiKey;
     }
 
     public Optional<TokenValidationResponse> validateAuthorizationHeader(String authHeader) {
@@ -54,6 +60,24 @@ public class AuthServiceClient {
         } catch (RestClientException ex) {
             log.warn("Failed to validate token via authentication-service: {}", ex.getMessage());
             return Optional.empty();
+        }
+    }
+
+    @SuppressWarnings("null")
+    public void updateUserProfile(UpdateUserProfileRequest request) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        if (internalApiKey != null && !internalApiKey.isBlank()) {
+            headers.set(INTERNAL_API_KEY_HEADER, internalApiKey);
+        }
+
+        HttpEntity<UpdateUserProfileRequest> entity = new HttpEntity<>(request, headers);
+
+        try {
+            restTemplate.exchange(baseUrl + "/auth/users/profile", HttpMethod.PUT, entity, Void.class);
+        } catch (RestClientException ex) {
+            log.error("Failed to update user profile in authentication-service: {}", ex.getMessage());
+            throw new IllegalStateException("Failed to synchronize authentication profile", ex);
         }
     }
 

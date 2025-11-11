@@ -6,21 +6,28 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
+import com.innowise.demo.client.AuthServiceClient;
+
 @SpringBootTest(properties = {
         "spring.cache.type=none"
 })
+@SuppressWarnings({"resource", "removal"})
 public abstract class BaseIntegrationTest {
     private static final boolean USE_TESTCONTAINERS =
             !"false".equalsIgnoreCase(System.getenv().getOrDefault("USE_TESTCONTAINERS", "true"));
 
     static PostgreSQLContainer<?> postgres;
     static GenericContainer<?> redis;
+
+    @MockBean
+    protected AuthServiceClient authServiceClient;
 
     static {
         // Создаём и стартуем контейнеры только если USE_TESTCONTAINERS=true

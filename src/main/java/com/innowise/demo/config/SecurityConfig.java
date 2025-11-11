@@ -1,8 +1,10 @@
 package com.innowise.demo.config;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,10 +13,13 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -24,6 +29,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableMethodSecurity(prePostEnabled = true)//for define security on methods
 @Profile({"keycloak", "auth-service"})
 public class SecurityConfig {
+
+    private static final String ROLE_PREFIX = "ROLE_";
 
     private final JwtDecoder jwtDecoder;
 
@@ -54,25 +61,77 @@ public class SecurityConfig {
     }
 
     /**
-     * Конвертер для извлечения ролей из realm_access в JWT токене Keycloak
+     * Конвертер для извлечения ролей из JWT токена.
      */
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter scopesConverter = new JwtGrantedAuthoritiesConverter();
+
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
-            if (realmAccess != null) {
-                @SuppressWarnings("unchecked")
-                List<String> roles = (List<String>) realmAccess.get("roles");
-                if (roles != null) {
-                    return roles.stream()
-                            .map(role -> new SimpleGrantedAuthority(role))
-                            .collect(Collectors.toList());
-                }
+            Set<GrantedAuthority> authorities = new HashSet<>();
+            Collection<GrantedAuthority> scopeAuthorities = scopesConverter.convert(jwt);
+            if (scopeAuthorities != null) {
+                authorities.addAll(scopeAuthorities);
             }
-            return List.of();
+
+            extractRealmRoles(jwt.getClaimAsMap("realm_access"), authorities);
+            extractResourceRoles(jwt.getClaimAsMap("resource_access"), authorities);
+
+            String singleRole = jwt.getClaimAsString("role");
+            if (StringUtils.hasText(singleRole)) {
+                authorities.add(new SimpleGrantedAuthority(formatRole(singleRole)));
+            }
+
+            @SuppressWarnings("unchecked")
+            Collection<String> flatRoles = (Collection<String>) jwt.getClaim("roles");
+            if (flatRoles != null) {
+                flatRoles.stream()
+                        .filter(StringUtils::hasText)
+                        .map(this::formatRole)
+                        .map(SimpleGrantedAuthority::new)
+                        .forEach(authorities::add);
+            }
+
+            return authorities;
         });
         return converter;
+    }
+
+    private void extractRealmRoles(Map<String, Object> realmAccess,
+                                   Set<GrantedAuthority> authorities) {
+        if (realmAccess == null) {
+            return;
+        }
+        addRoles(realmAccess.get("roles"), authorities);
+    }
+
+    private void extractResourceRoles(Map<String, Object> resourceAccess,
+                                      Set<GrantedAuthority> authorities) {
+        if (resourceAccess == null) {
+            return;
+        }
+        resourceAccess.values().forEach(value -> {
+            if (value instanceof Map<?, ?> map) {
+                addRoles(map.get("roles"), authorities);
+            }
+        });
+    }
+
+    private void addRoles(Object source, Set<GrantedAuthority> authorities) {
+        if (source instanceof Collection<?> collection) {
+            collection.stream()
+                    .map(Object::toString)
+                    .filter(StringUtils::hasText)
+                    .map(this::formatRole)
+                    .map(SimpleGrantedAuthority::new)
+                    .forEach(authorities::add);
+        }
+    }
+
+    private String formatRole(String role) {
+        String value = role.startsWith(ROLE_PREFIX) ? role : ROLE_PREFIX + role;
+        return value.toUpperCase();
     }
 
     @Bean
