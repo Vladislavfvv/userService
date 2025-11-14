@@ -23,6 +23,7 @@ import com.innowise.demo.service.UserService;
 import com.innowise.demo.dto.UserUpdateRequest;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Collection;
 import java.util.List;
@@ -33,10 +34,30 @@ import java.util.List;
 public class UserController {
     private final UserService userService;
     private final AuthServiceClient authServiceClient;
+    
+    @Value("${authentication.service.internal-api-key:}")
+    private String internalApiKey;
 
-    @PostMapping
-    public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserDto dto) {
-        return ResponseEntity.ok(userService.createUser(dto));
+    /**
+     * Эндпоинт для синхронизации пользователей из authentication-service
+     * Проверяет внутренний API ключ вместо роли
+     * 
+     * ВАЖНО: Публичный эндпоинт POST /api/v1/users удален, чтобы предотвратить
+     * создание "фантомных" пользователей. Все пользователи должны создаваться
+     * через регистрацию в authentication-service, которая затем синхронизирует
+     * их через этот эндпоинт /sync.
+     */
+    @PostMapping("/sync")
+    public ResponseEntity<UserDto> syncUser(
+            @RequestHeader(value = "X-Internal-Api-Key", required = false) String apiKey,
+            @Valid @RequestBody UserDto dto) {
+        // Проверка внутреннего API ключа
+        if (internalApiKey == null || internalApiKey.isBlank() || !internalApiKey.equals(apiKey)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        
+        // Создаем или возвращаем существующего пользователя
+        return ResponseEntity.ok(userService.syncUser(dto));
     }
 
     @GetMapping("/id")

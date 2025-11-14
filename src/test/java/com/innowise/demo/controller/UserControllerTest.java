@@ -25,7 +25,6 @@ import com.innowise.demo.client.dto.TokenValidationResponse;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.dto.UserUpdateRequest;
-import com.innowise.demo.exception.UserAlreadyExistsException;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.service.UserService;
 
@@ -36,7 +35,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -101,66 +99,9 @@ class UserControllerTest {
         };
     }
 
-    @Test
-    @DisplayName("POST /api/v1/users - успешное создание пользователя")
-    void createUser_ShouldReturnCreatedUser() throws Exception {
-        // given
-        UserDto requestDto = new UserDto();
-        requestDto.setName("Test");
-        requestDto.setSurname("User");
-        requestDto.setEmail("test@example.com");
-        requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
-
-        when(userService.createUser(any(UserDto.class))).thenReturn(userDto);
-
-        // when & then
-        mockMvc.perform(post("/api/v1/users")
-                        .with(adminAuth())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.name").value("Test"))
-                .andExpect(jsonPath("$.email").value("test@example.com"));
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/users - валидация: пустое имя")
-    void createUser_ShouldReturnBadRequest_WhenNameIsBlank() throws Exception {
-        // given
-        UserDto invalidDto = new UserDto();
-        invalidDto.setName(""); // пустое имя
-        invalidDto.setSurname("User");
-        invalidDto.setEmail("test@example.com");
-        invalidDto.setBirthDate(LocalDate.of(1990, 1, 1));
-
-        // when & then
-        mockMvc.perform(post("/api/v1/users")
-                        .with(adminAuth())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidDto)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("POST /api/v1/users - пользователь уже существует")
-    void createUser_ShouldReturnConflict_WhenUserAlreadyExists() throws Exception {
-        // given
-        UserDto requestDto = new UserDto();
-        requestDto.setName("Test");
-        requestDto.setSurname("User");
-        requestDto.setEmail("test@example.com");
-        requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
-
-        when(userService.createUser(any(UserDto.class)))
-                .thenThrow(new UserAlreadyExistsException("User with email test@example.com already exists"));
-
-        // when & then
-        mockMvc.perform(post("/api/v1/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isConflict());
-    }
+    // Тесты для POST /api/v1/users удалены, так как этот эндпоинт был удален.
+    // Пользователи теперь создаются только через регистрацию в authentication-service,
+    // которая синхронизирует их через POST /api/v1/users/sync (защищенный внутренним API ключом).
 
     @Test
     @DisplayName("GET /api/v1/users/id?id=1 - успешное получение пользователя по ID")

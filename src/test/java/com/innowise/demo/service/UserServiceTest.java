@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -284,14 +285,16 @@ class UserServiceTest {
             return dto;
         });
 
+        // Устанавливаем дефолтную дату рождения, чтобы пользователь мог её изменить
+        user.setBirthDate(LocalDate.now().minusYears(18));
+        
         UserUpdateRequest updateDto = new UserUpdateRequest();
         updateDto.setUserId(1L);
         updateDto.setName("Ivan");
         updateDto.setSurname("Vanusha");
-        updateDto.setEmail("Vanusha@example.com");
+        // Email нельзя изменить после регистрации - не обновляем email в тесте
+        // updateDto.setEmail("Vanusha@example.com");
         updateDto.setBirthDate(LocalDate.of(2000,1,1));
-
-        when(userRepository.findByEmailNativeQuery("Vanusha@example.com")).thenReturn(Optional.empty());
 
         authenticateAsUser("masha@gmail.com");
 
@@ -302,7 +305,7 @@ class UserServiceTest {
         assertNotNull(result);
         assertEquals("Ivan", result.getName());
         assertEquals("Vanusha", result.getSurname());
-        assertEquals("vanusha@example.com", result.getEmail());
+        assertEquals("masha@gmail.com", result.getEmail()); // Email не изменился
         assertEquals(LocalDate.of(2000,1,1), result.getBirthDate());
 
         verify(userRepository, times(1)).save(any(User.class));
@@ -346,12 +349,14 @@ class UserServiceTest {
     void deleteUser_ShouldCallRepository_WhenUserExists() {
         // given
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        doNothing().when(authServiceClient).deleteUser(any(String.class));
 
         // when
         userService.deleteUser(1L);
 
         // then
         verify(userRepository, times(1)).deleteById(1L);
+        verify(authServiceClient, times(1)).deleteUser(eq(user.getEmail()));
     }
 
     @DisplayName("deleteUser_Negative")
@@ -428,6 +433,8 @@ class UserServiceTest {
         // given
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         user.setCards(new ArrayList<>()); // пустой список карт
+        // Устанавливаем дефолтную дату рождения, чтобы пользователь мог её изменить
+        user.setBirthDate(LocalDate.now().minusYears(18));
 
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
@@ -445,11 +452,10 @@ class UserServiceTest {
         updateDto.setUserId(1L);
         updateDto.setName("Ivan");
         updateDto.setSurname("Vanusha");
-        updateDto.setEmail("Vanusha@example.com");
+        // Email нельзя изменить после регистрации - не обновляем email в тесте
+        // updateDto.setEmail("Vanusha@example.com");
         updateDto.setBirthDate(LocalDate.of(2000, 1, 1));
         updateDto.setCards(Collections.emptyList());
-
-        when(userRepository.findByEmailNativeQuery("Vanusha@example.com")).thenReturn(Optional.empty());
 
         authenticateAsUser("masha@gmail.com");
 

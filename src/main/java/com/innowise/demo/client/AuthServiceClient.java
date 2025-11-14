@@ -81,6 +81,33 @@ public class AuthServiceClient {
         }
     }
 
+    /**
+     * Удаление пользователя по email из authentication-service (auth_db и Keycloak)
+     */
+    public void deleteUser(String email) {
+        if (baseUrl == null || baseUrl.isBlank() || internalApiKey == null || internalApiKey.isBlank()) {
+            log.warn("Authentication service URL or internal API key not configured. Skipping user deletion in authentication-service.");
+            return;
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        if (internalApiKey != null && !internalApiKey.isBlank()) {
+            headers.set(INTERNAL_API_KEY_HEADER, internalApiKey);
+        }
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        try {
+            // URL-кодируем email для использования в path
+            String encodedEmail = java.net.URLEncoder.encode(email, java.nio.charset.StandardCharsets.UTF_8);
+            restTemplate.exchange(baseUrl + "/auth/users/" + encodedEmail, HttpMethod.DELETE, entity, Void.class);
+            log.info("Successfully deleted user {} from authentication-service", email);
+        } catch (RestClientException ex) {
+            log.error("Failed to delete user {} from authentication-service: {}", email, ex.getMessage(), ex);
+            // Не выбрасываем исключение, чтобы не прерывать удаление в user-service
+        }
+    }
+
     private String extractToken(String authHeader) {
         if (authHeader == null) {
             return null;

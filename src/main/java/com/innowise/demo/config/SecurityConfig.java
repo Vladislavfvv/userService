@@ -47,6 +47,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/cache/**").hasRole("ADMIN")
                     .requestMatchers("/actuator/health", "/actuator/info").hasRole("ADMIN")
+                    .requestMatchers("/api/v1/users/sync").permitAll() // Разрешаем доступ без JWT для синхронизации (проверка API ключа в контроллере)
                     .requestMatchers("/api/v1/users/**", "/api/v1/cards/**").hasAnyRole("ADMIN", "USER")
                     .anyRequest().authenticated()
             )

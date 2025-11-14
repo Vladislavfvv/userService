@@ -26,6 +26,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.innowise.demo.client.AuthServiceClient;
 import com.innowise.demo.client.dto.UpdateUserProfileRequest;
 import com.innowise.demo.dto.CardInfoDto;
@@ -47,6 +49,8 @@ import lombok.RequiredArgsConstructor;
 @CacheConfig(cacheNames = "users") // общий префикс для всех методов
 @SuppressWarnings("null")
 public class UserService {
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
+    
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final CardInfoRepository cardInfoRepository;
@@ -72,6 +76,43 @@ public class UserService {
         // Проверка на уникальность email
         if (userRepository.findByEmailNativeQuery(normalizedEmail).isPresent()) {
             throw new UserAlreadyExistsException(USER_WITH_EMAIL + normalizedEmail + " already exists");
+        }
+
+        // Создаём сущность пользователя
+        User entity = userMapper.toEntity(dto);
+
+        // Привязываем карты (старые и новые)
+        List<CardInfo> cards = userMapper.updateCards(entity, dto.getCards());
+        cards.forEach(c -> c.setUser(entity));
+        entity.setCards(cards);
+
+        // Hibernate сохранит и пользователя, и все его карты (CascadeType.ALL)
+        User saved = userRepository.save(entity);
+
+        return userMapper.toDto(saved);
+    }
+
+    /**
+     * Создание пользователя для синхронизации из authentication-service
+     * Не требует роли ADMIN, используется внутренний API ключ
+     */
+    @CachePut(key = "#result.id")
+    @CacheEvict(value = "users_all", allEntries = true)
+    public UserDto syncUser(UserDto dto) {
+        dto.setId(null);
+        if (dto.getCards() != null) {
+            dto.getCards().forEach(c -> c.setId(null));
+        }
+
+        String normalizedEmail = normalizeEmail(dto.getEmail());
+        dto.setEmail(normalizedEmail);
+
+        // Проверка на уникальность email
+        if (userRepository.findByEmailNativeQuery(normalizedEmail).isPresent()) {
+            // Пользователь уже существует, возвращаем его
+            User existingUser = userRepository.findByEmailNativeQuery(normalizedEmail)
+                    .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + normalizedEmail + NOT_FOUND_SUFFIX));
+            return userMapper.toDto(existingUser);
         }
 
         // Создаём сущность пользователя
@@ -184,8 +225,6 @@ public class UserService {
 
         ensureCurrentUserCanAccessUser(existUser, requireAuthentication());
 
-        String previousEmail = existUser.getEmail();
-
         if (dto.getUserId() != null && !dto.getUserId().equals(id)) {
             throw new AccessDeniedException("Cannot update another user");
         }
@@ -204,23 +243,43 @@ public class UserService {
             existUser.setSurname(dto.getSurname());
         }
 
+        // Email нельзя изменить после регистрации - игнорируем поле email из запроса
+        // if (dto.getEmail() != null) { ... }
+
+        // birthDate можно изменить пользователем один раз (если она дефолтная или не установлена)
+        // После явной установки пользователем, только админ может изменить
         if (dto.getBirthDate() != null) {
+            Authentication auth = requireAuthentication();
+            boolean isAdmin = isAdmin(auth);
+            
+            LocalDate currentBirthDate = existUser.getBirthDate();
+            if (currentBirthDate != null && !isAdmin) {
+                // Проверяем, является ли текущая дата дефолтной (примерно 18 лет назад)
+                // Дефолтная дата устанавливается в UserServiceClient как LocalDate.now().minusYears(18)
+                // Используем более широкий диапазон проверки (±365 дней), чтобы учесть возможные задержки при регистрации
+                LocalDate now = LocalDate.now();
+                LocalDate defaultBirthDateMin = now.minusYears(19); // Минимум 17 лет назад
+                LocalDate defaultBirthDateMax = now.minusYears(17); // Максимум 19 лет назад
+                
+                // Если текущая дата находится в диапазоне дефолтных значений (17-19 лет назад),
+                // разрешаем пользователю установить реальную дату рождения один раз
+                // Если дата выходит за этот диапазон, значит она была явно установлена пользователем ранее
+                if (currentBirthDate.isBefore(defaultBirthDateMin) || currentBirthDate.isAfter(defaultBirthDateMax)) {
+                    throw new AccessDeniedException("Birth date can only be changed by admin");
+                }
+            }
+            
+            // Разрешаем установку даты рождения, если:
+            // 1. Дата не установлена (null)
+            // 2. Дата находится в диапазоне дефолтных значений (17-19 лет назад) - пользователь устанавливает реальную дату в первый раз
+            // 3. Пользователь - админ
             existUser.setBirthDate(dto.getBirthDate());
         }
 
-        if (dto.getEmail() != null) {
-            if (dto.getEmail().isBlank()) {
-                throw new AccessDeniedException("Email must not be blank");
-            }
-            String normalizedEmail = normalizeEmail(dto.getEmail());
-        if (!normalizedEmail.equalsIgnoreCase(existUser.getEmail())
-                    && userRepository.findByEmailNativeQuery(normalizedEmail).isPresent()) {
-                throw new UserAlreadyExistsException(USER_WITH_EMAIL + normalizedEmail + " already exists");
-            }
-            existUser.setEmail(normalizedEmail);
-        }
-
         if (dto.getCards() != null) {
+            // Генерируем holder из имени и фамилии пользователя
+            String cardHolder = generateCardHolder(existUser.getName(), existUser.getSurname());
+            
             Map<Long, CardInfo> existingCardsById = existUser.getCards().stream()
                     .filter(c -> c.getId() != null)
                     .collect(Collectors.toMap(CardInfo::getId, c -> c));
@@ -232,11 +291,10 @@ public class UserService {
             List<CardInfo> updatedCards = new ArrayList<>();
 
             for (CardInfoDto cardDto : dto.getCards()) {
-                Long ownerId = cardDto.getUserId() != null ? cardDto.getUserId() : id;
-                if (!ownerId.equals(id)) {
-                    throw new AccessDeniedException("Cannot assign card to another user");
-                }
+                // Игнорируем userId из запроса, всегда используем id пользователя
                 cardDto.setUserId(id);
+                // Игнорируем holder из запроса, всегда используем имя и фамилию пользователя
+                cardDto.setHolder(cardHolder);
 
                 String signature = cardSignature(cardDto);
                 if (seenSignatures.contains(signature)) {
@@ -247,20 +305,20 @@ public class UserService {
                 if (cardDto.getId() != null && existingCardsById.containsKey(cardDto.getId())) {
                     CardInfo existingCard = existingCardsById.get(cardDto.getId());
                     existingCard.setNumber(cardDto.getNumber());
-                    existingCard.setHolder(cardDto.getHolder());
+                    existingCard.setHolder(cardHolder); // Используем автоматически сгенерированный holder
                     existingCard.setExpirationDate(cardDto.getExpirationDate());
                     updatedCards.add(existingCard);
                     existingCardsBySignature.put(signature, existingCard);
                 } else if (existingCardsBySignature.containsKey(signature)) {
                     CardInfo existingCard = existingCardsBySignature.get(signature);
                     existingCard.setNumber(cardDto.getNumber());
-                    existingCard.setHolder(cardDto.getHolder());
+                    existingCard.setHolder(cardHolder); // Используем автоматически сгенерированный holder
                     existingCard.setExpirationDate(cardDto.getExpirationDate());
                     updatedCards.add(existingCard);
                 } else {
                     CardInfo newCard = new CardInfo();
                     newCard.setNumber(cardDto.getNumber());
-                    newCard.setHolder(cardDto.getHolder());
+                    newCard.setHolder(cardHolder); // Используем автоматически сгенерированный holder
                     newCard.setExpirationDate(cardDto.getExpirationDate());
                     newCard.setUser(existUser);
                     updatedCards.add(newCard);
@@ -273,20 +331,34 @@ public class UserService {
         }
 
         User saved = userRepository.save(existUser);
-        synchronizeAuthenticationProfile(previousEmail, saved);
+        // Синхронизируем только имя и фамилию, email (логин) не изменяем
+        // Используем текущий email пользователя, так как email не может быть изменен
+        synchronizeAuthenticationProfile(saved.getEmail(), saved);
         return userMapper.toDto(saved);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','USER')")
-    @CacheEvict(value = "users_all", allEntries = true)
-    @CachePut(key = "#id")
+    @PreAuthorize("hasRole('ADMIN')")
+    @CacheEvict(value = {"users", "users_all"}, key = "#id", allEntries = true)
     @Transactional
     public void deleteUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
 
-        ensureCurrentUserCanAccessUser(user, requireAuthentication());
+        String userEmail = user.getEmail();
+        
+        // Удаление из базы данных user-service
         userRepository.deleteById(id);
+        log.info("Deleted user {} (id: {}) from user-service database", userEmail, id);
+        
+        // Удаление из authentication-service (auth_db и Keycloak)
+        if (userEmail != null && !userEmail.isBlank()) {
+            try {
+                authServiceClient.deleteUser(userEmail);
+            } catch (Exception e) {
+                log.error("Failed to delete user {} from authentication-service: {}", userEmail, e.getMessage(), e);
+                // Не выбрасываем исключение, чтобы не прерывать удаление в user-service
+            }
+        }
     }
 
     private Authentication requireAuthentication() {
@@ -374,16 +446,26 @@ public class UserService {
         return email.trim().toLowerCase();
     }
 
-    private void synchronizeAuthenticationProfile(String previousEmail, User user) {
+    private void synchronizeAuthenticationProfile(String email, User user) {
         try {
+            // Логин (email) не изменяем - передаем одинаковый email для currentLogin и newLogin
+            // Синхронизируем только имя и фамилию
+            String firstName = resolveProfileName(user.getName(), user.getEmail());
+            String lastName = resolveProfileName(user.getSurname(), user.getEmail());
+            log.info("Synchronizing user profile for {}: firstName={}, lastName={}", email, firstName, lastName);
             authServiceClient.updateUserProfile(new UpdateUserProfileRequest(
-                    previousEmail == null ? user.getEmail() : previousEmail,
-                    user.getEmail(),
-                    resolveProfileName(user.getName(), user.getEmail()),
-                    resolveProfileName(user.getSurname(), user.getEmail())
+                    email, // currentLogin - текущий логин (не изменяется)
+                    email, // newLogin - новый логин (остается тем же)
+                    firstName,
+                    lastName
             ));
+            log.info("Successfully synchronized user profile for {}", email);
         } catch (IllegalStateException ex) {
+            log.error("Failed to synchronize user profile for {}: {}", email, ex.getMessage(), ex);
             throw ex;
+        } catch (Exception ex) {
+            log.error("Failed to synchronize user profile for {}: {}", email, ex.getMessage(), ex);
+            // Не выбрасываем исключение, чтобы не прерывать обновление в user-service
         }
     }
 
@@ -406,5 +488,23 @@ public class UserService {
         return (number == null ? "" : number.trim()) + "|" +
                 (holder == null ? "" : holder.trim()) + "|" +
                 (expirationDate == null ? "" : expirationDate.toString());
+    }
+
+    /**
+     * Генерирует holder для карточки из имени и фамилии пользователя
+     */
+    private String generateCardHolder(String firstName, String lastName) {
+        String name = firstName != null ? firstName.trim() : "";
+        String surname = lastName != null ? lastName.trim() : "";
+        if (name.isEmpty() && surname.isEmpty()) {
+            return "";
+        }
+        if (name.isEmpty()) {
+            return surname;
+        }
+        if (surname.isEmpty()) {
+            return name;
+        }
+        return name + " " + surname;
     }
 }

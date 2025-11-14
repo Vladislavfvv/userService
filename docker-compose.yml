@@ -37,9 +37,9 @@ services:
     networks:
       - backend-network
 
-  user_service:
+  user-service:
     build: .
-    container_name: user_service
+    container_name: user-service
     depends_on:
       postgres:
         condition: service_healthy
