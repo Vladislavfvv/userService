@@ -1,0 +1,147 @@
+package com.innowise.demo.integration;
+
+import java.time.LocalDate;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.innowise.demo.dto.UserDto;
+import com.innowise.demo.dto.UserUpdateRequest;
+import com.innowise.demo.exception.UserNotFoundException;
+import com.innowise.demo.mapper.UserMapper;
+import com.innowise.demo.model.User;
+import com.innowise.demo.repository.UserRepository;
+import com.innowise.demo.service.UserService;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
+
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+class UserServiceIT extends BaseIntegrationTest{
+
+
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private UserMapper userMapper;
+
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    private UserDto userDto;
+
+    @BeforeEach
+    void setUp() {
+        userRepository.deleteAll();
+
+        userDto = new UserDto();
+        userDto.setName("Integration");
+        userDto.setSurname("Test");
+        userDto.setEmail("integration@example.com");
+        userDto.setBirthDate(LocalDate.of(1995, 5, 5));
+
+        // Мокируем вызов authServiceClient.deleteUser(), чтобы он не выбрасывал исключение
+        doNothing().when(authServiceClient).deleteUser(anyString());
+        // Мокируем вызов authServiceClient.updateUserProfile(), чтобы он не выбрасывал исключение
+        doNothing().when(authServiceClient).updateUserProfile(any());
+    }
+
+    @Test
+    @Order(1)
+    void createUser_ShouldSaveUser() {
+        UserDto saved = userService.createUser(userDto);
+
+        assertNotNull(saved.getId());
+        assertEquals("integration@example.com", saved.getEmail());
+        assertEquals(1, userRepository.count());
+    }
+
+    @Test
+    @Order(2)
+    void findUserById_ShouldReturnUser() {
+        User saved = userRepository.save(userMapper.toEntity(userDto));
+
+        UserDto result = userService.findUserById(saved.getId());
+
+        assertNotNull(result);
+        assertEquals(saved.getEmail(), result.getEmail());
+    }
+
+    @Test
+    @Order(3)
+    void findUserById_NotFound_ShouldThrow() {
+        assertThrows(UserNotFoundException.class, () -> userService.findUserById(999L));
+    }
+
+    @Test
+    @Order(4)
+    void getUserByEmailNative_ShouldReturnUser() {
+        User saved = userRepository.save(userMapper.toEntity(userDto));
+
+        UserDto result = userService.getUserByEmailNative(saved.getEmail());
+
+        assertNotNull(result);
+        assertEquals(saved.getEmail(), result.getEmail());
+    }
+
+    @Test
+    @Order(5)
+    void updateUser_ShouldModifyData() {
+        User saved = userRepository.save(userMapper.toEntity(userDto));
+        // Устанавливаем дефолтную дату рождения, чтобы пользователь мог её изменить
+        saved.setBirthDate(LocalDate.now().minusYears(18));
+        saved = userRepository.save(saved);
+
+        UserUpdateRequest updateDto = new UserUpdateRequest();
+        updateDto.setUserId(saved.getId());
+        updateDto.setName("Updated");
+        updateDto.setSurname("User");
+        // Email нельзя изменить после регистрации - не обновляем email в тесте
+        // updateDto.setEmail("updated@example.com");
+        updateDto.setBirthDate(LocalDate.of(1990, 1, 1));
+
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        saved.getEmail(),
+                        null,
+                        java.util.List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        UserDto updated = userService.updateUser(saved.getId(), updateDto);
+
+        assertEquals("Updated", updated.getName());
+        assertEquals("integration@example.com", updated.getEmail()); // Email не изменился
+        assertEquals(LocalDate.of(1990, 1, 1), updated.getBirthDate());
+
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @Order(6)
+    void deleteUser_ShouldRemoveFromDatabase() {
+        User saved = userRepository.save(userMapper.toEntity(userDto));
+
+        userService.deleteUser(saved.getId());
+
+        assertEquals(0, userRepository.count());
+    }
+}
+
