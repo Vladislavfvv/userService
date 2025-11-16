@@ -1,10 +1,5 @@
 package com.innowise.demo.integration;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -79,22 +74,16 @@ public abstract class BaseIntegrationTest {
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         if (USE_TESTCONTAINERS) {
-            try (Connection conn = DriverManager.getConnection(
-                    postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-                 Statement stmt = conn.createStatement()) {
-                stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-
+            // Используем схему public по умолчанию (не создаем userservice_data)
+            
             registry.add("spring.datasource.url",
-                    () -> postgres.getJdbcUrl() + "?currentSchema=userservice_data");
+                    () -> postgres.getJdbcUrl() + "?currentSchema=public");
             registry.add("spring.datasource.username", postgres::getUsername);
             registry.add("spring.datasource.password", postgres::getPassword);
 
             registry.add("spring.liquibase.enabled", () -> "false");
             registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
+            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "public");
 
             // Hikari: более короткий lifecycle для тестов, чтобы не было WARN на shutdown
             registry.add("spring.datasource.hikari.max-lifetime", () -> "30000");
@@ -118,20 +107,15 @@ public abstract class BaseIntegrationTest {
 
             String baseUrl = "jdbc:postgresql://" + pgHost + ":" + pgPort + "/" + pgDb;
 
-            try (Connection conn = DriverManager.getConnection(baseUrl, pgUser, pgPass);
-                 Statement stmt = conn.createStatement()) {
-                stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
+            // Используем схему public по умолчанию (не создаем userservice_data)
 
-            registry.add("spring.datasource.url", () -> baseUrl + "?currentSchema=userservice_data");
+            registry.add("spring.datasource.url", () -> baseUrl + "?currentSchema=public");
             registry.add("spring.datasource.username", () -> pgUser);
             registry.add("spring.datasource.password", () -> pgPass);
 
             registry.add("spring.liquibase.enabled", () -> "false");
             registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
+            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "public");
 
             // Hikari в CI
             registry.add("spring.datasource.hikari.max-lifetime", () -> "30000");

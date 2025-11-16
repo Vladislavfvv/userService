@@ -46,7 +46,8 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/cache/**").hasRole("ADMIN")
-                    .requestMatchers("/actuator/health", "/actuator/info").hasRole("ADMIN")
+                    // Actuator health endpoint доступен без аутентификации
+                    .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                     .requestMatchers("/api/v1/users/sync").permitAll() // Разрешаем доступ без JWT для синхронизации (проверка API ключа в контроллере)
                     .requestMatchers("/api/v1/users/**", "/api/v1/cards/**").hasAnyRole("ADMIN", "USER")
                     .anyRequest().authenticated()

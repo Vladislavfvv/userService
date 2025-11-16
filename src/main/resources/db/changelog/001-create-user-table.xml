@@ -10,7 +10,7 @@
             </not>
         </preConditions>
 
-        <createTable tableName="users" schemaName="userservice_data">
+        <createTable tableName="users">
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
