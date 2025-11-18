@@ -37,9 +37,9 @@ services:
     networks:
       - backend-network
 
-  user_service:
+  user-service:
     build: .
-    container_name: user_service
+    container_name: user-service
     depends_on:
       us_db:
         condition: service_healthy
@@ -64,4 +64,5 @@ volumes:
 
 networks:
   backend-network:
+    name: backend-network
     driver: bridge
