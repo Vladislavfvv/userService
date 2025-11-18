@@ -34,6 +34,7 @@
         <testcontainers.version>1.20.3</testcontainers.version>
         <testcontainers.redis.version>2.2.4</testcontainers.redis.version>
         <jacoco.version>0.8.10</jacoco.version>
+        <jjwt-api.version>0.11.5</jjwt-api.version>
     </properties>
     <dependencies>
 
@@ -52,6 +53,31 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Spring Security OAuth2 Resource Server для работы с JWT токенами -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
+        <!-- JJWT для работы с JWT токенами (совместимость с auth-service) -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt-api.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt-api.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt-api.version}</version>
+            <scope>runtime</scope>
         </dependency>
 
         <!-- PostgreSQL -->

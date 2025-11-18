@@ -14,6 +14,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.innowise.demo.dto.CardInfoDto;
+import com.innowise.demo.dto.CreateUserFromTokenRequest;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.exception.UserAlreadyExistsException;
@@ -38,6 +39,42 @@ public class UserService {
     private static final String USER_WITH_EMAIL = "User with email ";
     private static final String PREFIX_WITH_ID = "User with id ";
 
+
+    /**
+     * Создает пользователя из JWT токена.
+     * Email берется из токена (для проверки уникальности),
+     * остальные данные из запроса.
+     * 
+     * @param email email пользователя, извлеченный из JWT токена
+     * @param request данные пользователя (name, surname, birthDate)
+     * @return созданный пользователь
+     * @throws UserAlreadyExistsException если пользователь с таким email уже существует
+     */
+    @CachePut(key = "#result.id")
+    @CacheEvict(value = "users_all", allEntries = true)
+    public UserDto createUserFromToken(String email, CreateUserFromTokenRequest request) {
+        // Проверка на уникальность email из токена
+        if (userRepository.findByEmailNativeQuery(email).isPresent()) {
+            throw new UserAlreadyExistsException(USER_WITH_EMAIL + email + " already exists");
+        }
+
+        // Создаем DTO с email из токена и данными из запроса
+        UserDto userDto = new UserDto();
+        userDto.setEmail(email);
+        userDto.setName(request.getName());
+        userDto.setSurname(request.getSurname());
+        userDto.setBirthDate(request.getBirthDate());
+        userDto.setCards(null); // Карты можно добавить позже через отдельный endpoint
+
+        // Создаём сущность пользователя
+        User entity = userMapper.toEntity(userDto);
+        entity.setCards(new ArrayList<>()); // Пустой список карт
+
+        // Hibernate сохранит пользователя
+        User saved = userRepository.save(entity);
+
+        return userMapper.toDto(saved);
+    }
 
     @CachePut(key = "#result.id")
     @CacheEvict(value = "users_all", allEntries = true) // очищаем кэш списка
