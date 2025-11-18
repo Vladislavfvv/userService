@@ -98,7 +98,7 @@ public class UserController {
             return jwt;
         }
         return null;
-    }
+    }   
 
     @GetMapping("/id")
     public ResponseEntity<UserDto> getUserById(@RequestParam Long id) {

@@ -10,7 +10,7 @@
             </not>
         </preConditions>
 
-        <createTable tableName="users" schemaName="userservice_data">
+        <createTable tableName="users" schemaName="public">
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -21,7 +21,7 @@
                 <constraints nullable="false" unique="true"/>
             </column>
         </createTable>
-        <createIndex tableName="users" indexName="idx_users_email">
+        <createIndex tableName="users" indexName="idx_users_email" schemaName="public">
             <column name="email"/>
         </createIndex>
 

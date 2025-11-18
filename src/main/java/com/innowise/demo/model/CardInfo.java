@@ -24,7 +24,7 @@ import lombok.Setter;
         @Index(name = "idx_card_user", columnList = "user_id"),
         @Index(name = "idx_card_number", columnList = "number")
 },
-        schema="userservice_data")
+        schema = "public")
 @Getter
 @Setter
 @NoArgsConstructor
