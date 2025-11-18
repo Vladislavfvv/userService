@@ -1,5 +1,7 @@
 package com.innowise.demo.config;
 
+import java.util.Collections;
+
 import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -8,8 +10,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
 import io.jsonwebtoken.security.Keys;
@@ -43,7 +47,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.decoder(jwtDecoder()))
+                        .jwt(jwt -> jwt
+                                .decoder(jwtDecoder())
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                        )
                 );
 
         return http.build();
@@ -57,6 +64,28 @@ public class SecurityConfig {
     public JwtDecoder jwtDecoder() {
         SecretKey secretKey = Keys.hmacShaKeyFor(jwtSecret.getBytes());
         return NimbusJwtDecoder.withSecretKey(secretKey).build();
+    }
+
+    /**
+     * Создает JWT Authentication Converter для правильной обработки ролей из токена.
+     * Извлекает роль из claim "role" и преобразует её в GrantedAuthority.
+     * Поддерживает как "ROLE_USER"/"ROLE_ADMIN", так и "USER"/"ADMIN".
+     */
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            String role = jwt.getClaimAsString("role");
+            if (role == null || role.isEmpty()) {
+                return Collections.emptyList();
+            }
+            
+            // Убираем префикс ROLE_, если он есть (Spring Security добавит его автоматически)
+            String authority = role.startsWith("ROLE_") ? role.substring(5) : role;
+            
+            return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + authority));
+        });
+        return converter;
     }
 }
 
