@@ -1,26 +1,48 @@
 package com.innowise.demo.integration;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
-
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
+import com.innowise.demo.client.AuthServiceClient;
+
 @SpringBootTest(properties = {
         "spring.cache.type=none"
 })
+@SuppressWarnings({"resource", "removal"})
 public abstract class BaseIntegrationTest {
     private static final boolean USE_TESTCONTAINERS =
             !"false".equalsIgnoreCase(System.getenv().getOrDefault("USE_TESTCONTAINERS", "true"));
 
     static PostgreSQLContainer<?> postgres;
     static GenericContainer<?> redis;
+
+    @MockBean
+    protected AuthServiceClient authServiceClient;
+
+    @BeforeEach
+    void authenticateAsAdmin() {
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        "admin@tut.by",
+                        "admin",
+                        java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
+    }
 
     static {
         // Создаём и стартуем контейнеры только если USE_TESTCONTAINERS=true
@@ -52,22 +74,16 @@ public abstract class BaseIntegrationTest {
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
         if (USE_TESTCONTAINERS) {
-            try (Connection conn = DriverManager.getConnection(
-                    postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-                 Statement stmt = conn.createStatement()) {
-                stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-
+            // Используем схему public по умолчанию (не создаем userservice_data)
+            
             registry.add("spring.datasource.url",
-                    () -> postgres.getJdbcUrl() + "?currentSchema=userservice_data");
+                    () -> postgres.getJdbcUrl() + "?currentSchema=public");
             registry.add("spring.datasource.username", postgres::getUsername);
             registry.add("spring.datasource.password", postgres::getPassword);
 
             registry.add("spring.liquibase.enabled", () -> "false");
             registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
+            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "public");
 
             // Hikari: более короткий lifecycle для тестов, чтобы не было WARN на shutdown
             registry.add("spring.datasource.hikari.max-lifetime", () -> "30000");
@@ -91,20 +107,15 @@ public abstract class BaseIntegrationTest {
 
             String baseUrl = "jdbc:postgresql://" + pgHost + ":" + pgPort + "/" + pgDb;
 
-            try (Connection conn = DriverManager.getConnection(baseUrl, pgUser, pgPass);
-                 Statement stmt = conn.createStatement()) {
-                stmt.execute("CREATE SCHEMA IF NOT EXISTS userservice_data");
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
+            // Используем схему public по умолчанию (не создаем userservice_data)
 
-            registry.add("spring.datasource.url", () -> baseUrl + "?currentSchema=userservice_data");
+            registry.add("spring.datasource.url", () -> baseUrl + "?currentSchema=public");
             registry.add("spring.datasource.username", () -> pgUser);
             registry.add("spring.datasource.password", () -> pgPass);
 
             registry.add("spring.liquibase.enabled", () -> "false");
             registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "userservice_data");
+            registry.add("spring.jpa.properties.hibernate.default_schema", () -> "public");
 
             // Hikari в CI
             registry.add("spring.datasource.hikari.max-lifetime", () -> "30000");

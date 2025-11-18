@@ -23,8 +23,7 @@ import lombok.Setter;
 @Table(name = "card_info", indexes = {
         @Index(name = "idx_card_user", columnList = "user_id"),
         @Index(name = "idx_card_number", columnList = "number")
-},
-        schema="userservice_data")
+})
 @Getter
 @Setter
 @NoArgsConstructor

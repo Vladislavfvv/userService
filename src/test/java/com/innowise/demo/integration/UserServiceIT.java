@@ -9,7 +9,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import com.innowise.demo.dto.UserDto;
+import com.innowise.demo.dto.UserUpdateRequest;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.UserMapper;
 import com.innowise.demo.model.User;
@@ -19,6 +24,9 @@ import com.innowise.demo.service.UserService;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class UserServiceIT extends BaseIntegrationTest{
@@ -48,6 +56,11 @@ class UserServiceIT extends BaseIntegrationTest{
         userDto.setSurname("Test");
         userDto.setEmail("integration@example.com");
         userDto.setBirthDate(LocalDate.of(1995, 5, 5));
+
+        // Мокируем вызов authServiceClient.deleteUser(), чтобы он не выбрасывал исключение
+        doNothing().when(authServiceClient).deleteUser(anyString());
+        // Мокируем вызов authServiceClient.updateUserProfile(), чтобы он не выбрасывал исключение
+        doNothing().when(authServiceClient).updateUserProfile(any());
     }
 
     @Test
@@ -92,17 +105,33 @@ class UserServiceIT extends BaseIntegrationTest{
     @Order(5)
     void updateUser_ShouldModifyData() {
         User saved = userRepository.save(userMapper.toEntity(userDto));
+        // Устанавливаем дефолтную дату рождения, чтобы пользователь мог её изменить
+        saved.setBirthDate(LocalDate.now().minusYears(18));
+        saved = userRepository.save(saved);
 
-        UserDto updateDto = new UserDto();
+        UserUpdateRequest updateDto = new UserUpdateRequest();
+        updateDto.setUserId(saved.getId());
         updateDto.setName("Updated");
         updateDto.setSurname("User");
-        updateDto.setEmail("updated@example.com");
+        // Email нельзя изменить после регистрации - не обновляем email в тесте
+        // updateDto.setEmail("updated@example.com");
         updateDto.setBirthDate(LocalDate.of(1990, 1, 1));
+
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(
+                        saved.getEmail(),
+                        null,
+                        java.util.List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
         UserDto updated = userService.updateUser(saved.getId(), updateDto);
 
         assertEquals("Updated", updated.getName());
-        assertEquals("updated@example.com", updated.getEmail());
+        assertEquals("integration@example.com", updated.getEmail()); // Email не изменился
+        assertEquals(LocalDate.of(1990, 1, 1), updated.getBirthDate());
+
+        SecurityContextHolder.clearContext();
     }
 
     @Test

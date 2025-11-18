@@ -24,7 +24,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailJPQL(@Param("email") String email);
 
     //Native Sql
-    @Query(value = "SELECT * from userservice_data.users u where u.email = :email", nativeQuery=true)
+    @Query(value = "SELECT * from public.users u where u.email = :email", nativeQuery=true)
     Optional<User> findByEmailNativeQuery(@Param("email") String email);
 
     //для решения проблемы ленивой инициализации:

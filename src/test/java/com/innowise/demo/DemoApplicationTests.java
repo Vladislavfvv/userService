@@ -1,11 +1,11 @@
 package com.innowise.demo;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
 import com.innowise.demo.integration.BaseIntegrationTest;
 
-//@Disabled("Temporary")
-@SpringBootTest
+@ActiveProfiles("test")
 class DemoApplicationTests extends BaseIntegrationTest {
 
 
