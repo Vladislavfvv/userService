@@ -8,7 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +30,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import java.time.Instant;
+import java.util.Collections;
+
 @WebMvcTest(UserController.class)
 class UserControllerTest {
 
@@ -39,7 +45,7 @@ class UserControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private UserService userService;
 
     private UserDto userDto;
@@ -183,6 +189,86 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(5));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/self - успешное получение своих данных")
+    void getSelfUser_ShouldReturnUser() throws Exception {
+        // given
+        String email = "test@example.com";
+        when(userService.getUserByEmail(email)).thenReturn(userDto);
+
+        // Создаем мок JWT токена с email в subject
+        Jwt jwt = Jwt.withTokenValue("mock-token")
+                .header("alg", "HS256")
+                .claim("sub", email)
+                .claim("role", "USER")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+                jwt,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+
+        // when & then
+        mockMvc.perform(get("/api/v1/users/self")
+                        .principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.email").value("test@example.com"))
+                .andExpect(jsonPath("$.name").value("Test"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/self - пользователь не найден")
+    void getSelfUser_ShouldReturnNotFound_WhenUserNotFound() throws Exception {
+        // given
+        String email = "notfound@example.com";
+        when(userService.getUserByEmail(email))
+                .thenThrow(new UserNotFoundException("User with email notfound@example.com not found!"));
+
+        // Создаем мок JWT токена с email в subject
+        Jwt jwt = Jwt.withTokenValue("mock-token")
+                .header("alg", "HS256")
+                .claim("sub", email)
+                .claim("role", "USER")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+                jwt,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+
+        // when & then
+        mockMvc.perform(get("/api/v1/users/self")
+                        .principal(authentication))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/self - токен без email")
+    void getSelfUser_ShouldReturnForbidden_WhenTokenHasNoEmail() throws Exception {
+        // given - JWT токен без subject (email)
+        Jwt jwt = Jwt.withTokenValue("mock-token")
+                .header("alg", "HS256")
+                .claim("role", "USER")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+                jwt,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+
+        // when & then
+        mockMvc.perform(get("/api/v1/users/self")
+                        .principal(authentication))
+                .andExpect(status().isForbidden());
     }
 
     @Test

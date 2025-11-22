@@ -32,6 +32,26 @@ public class UserController {
     private final UserService userService;
 
     /**
+     * Получение своих данных из JWT токена.
+     * Email извлекается из токена (claim "sub"), пользователь получает свои данные.
+     * 
+     * @param authentication объект аутентификации, содержащий JWT токен
+     * @return данные текущего пользователя
+     */
+    @GetMapping("/self")
+    public ResponseEntity<UserDto> getSelfUser(Authentication authentication) {
+        log.info("Getting user data from token");
+        
+        // Извлекаем email из JWT токена
+        String email = SecurityUtils.getEmailFromToken(authentication);
+        log.debug("Extracted email from token: {}", email);
+        
+        // Получаем пользователя по email
+        UserDto userDto = userService.getUserByEmail(email);
+        return ResponseEntity.ok(userDto);
+    }
+
+    /**
      * Создание пользователя из JWT токена.
      * Email извлекается из токена (claim "sub"), остальные данные из тела запроса.
      * Пользователь должен быть зарегистрирован в auth-service и иметь валидный JWT токен.

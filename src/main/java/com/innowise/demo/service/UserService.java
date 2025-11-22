@@ -10,6 +10,7 @@ import org.springframework.cache.annotation.CacheConfig;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -54,7 +55,7 @@ public class UserService {
      * @throws UserAlreadyExistsException если пользователь с таким email уже существует
      */
     @CachePut(key = "#result.id")
-    @CacheEvict(value = "users_all", allEntries = true)
+    @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true)
     public UserDto createUserFromToken(String email, CreateUserFromTokenRequest request) {
         // Проверка на уникальность email из токена
         if (userRepository.findByEmailNativeQuery(email).isPresent()) {
@@ -80,7 +81,7 @@ public class UserService {
     }
 
     @CachePut(key = "#result.id")
-    @CacheEvict(value = "users_all", allEntries = true) // очищаем кэш списка
+    @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true) // очищаем кэш списка и по email
     public UserDto createUser(UserDto dto) {
         dto.setId(null);
         if (dto.getCards() != null) {
@@ -178,7 +179,7 @@ public class UserService {
      * @throws AccessDeniedException если пользователь пытается обновить чужую информацию
      */
     @CachePut(key = "#id")
-    @CacheEvict(value = "users_all", allEntries = true)
+    @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true)
     @Transactional
     public UserDto updateUser(Long id, UpdateUserDto dto, String userEmail) {
         // Получаем пользователя для проверки доступа
@@ -296,8 +297,10 @@ public class UserService {
         return userMapper.toDto(userRepository.save(existUser));
     }
 
-    @CacheEvict(value = "users_all", allEntries = true)
-    @CachePut(key = "#id")
+    @Caching(evict = {
+            @CacheEvict(value = {"users", "users_all", "users_by_email"}, allEntries = true),
+            @CacheEvict(value = "users", key = "#id")
+    })
     @Transactional
     public void deleteUser(Long id) {
         userRepository.findById(id)
