@@ -16,10 +16,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import com.innowise.demo.dto.PagedUserResponse;
+import com.innowise.demo.dto.UpdateUserDto;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.UserMapper;
 import com.innowise.demo.model.User;
+import com.innowise.demo.repository.CardInfoRepository;
 import com.innowise.demo.repository.UserRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,6 +42,9 @@ class UserServiceTest {
 
     @Mock
     private UserMapper userMapper;
+
+    @Mock
+    private CardInfoRepository cardInfoRepository;
 
     @Mock
     private CacheManager cacheManager;
@@ -245,23 +250,40 @@ class UserServiceTest {
             return dto;
         });
 
-        UserDto updateDto = new UserDto();
+        UpdateUserDto updateDto = new UpdateUserDto();
         updateDto.setName("Ivan");
         updateDto.setSurname("Vanusha");
-        updateDto.setEmail("Vanusha@example.com");
         updateDto.setBirthDate(LocalDate.of(2000,1,1));
 
-        // when
-        UserDto result = userService.updateUser(1L, updateDto);
+        // when - используем email пользователя из мока (masha@gmail.com)
+        UserDto result = userService.updateUser(1L, updateDto, "masha@gmail.com");
 
         // then
         assertNotNull(result);
         assertEquals("Ivan", result.getName());
         assertEquals("Vanusha", result.getSurname());
-        assertEquals("Vanusha@example.com", result.getEmail());
+        assertEquals("masha@gmail.com", result.getEmail()); // email не меняется, берется из токена
         assertEquals(LocalDate.of(2000,1,1), result.getBirthDate());
 
         verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @DisplayName("updateUser_Negative_AccessDenied")
+    @Test
+    void updateUser_ShouldThrowAccessDenied_WhenEmailMismatch() {
+        // given
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        UpdateUserDto updateDto = new UpdateUserDto();
+        updateDto.setName("Ivan");
+
+        // when & then - пытаемся обновить с другим email
+        org.springframework.security.access.AccessDeniedException exception = 
+            assertThrows(org.springframework.security.access.AccessDeniedException.class, 
+                () -> userService.updateUser(1L, updateDto, "other@example.com"));
+
+        assertTrue(exception.getMessage().contains("Access denied"));
+        assertTrue(exception.getMessage().contains("Please, change Id in url"));
     }
 
     // ----------------- deleteUser -----------------
@@ -354,6 +376,12 @@ class UserServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         user.setCards(new ArrayList<>()); // пустой список карт
 
+        // Моки для проверки карт (если карты не переданы, репозиторий не вызывается)
+        when(cardInfoRepository.findByNumberAndUserId(any(String.class), any(Long.class)))
+                .thenReturn(Optional.empty());
+        when(cardInfoRepository.findByNumber(any(String.class)))
+                .thenReturn(Optional.empty());
+
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
             User u = invocation.getArgument(0);
@@ -366,15 +394,14 @@ class UserServiceTest {
             return dto;
         });
 
-        UserDto updateDto = new UserDto();
+        UpdateUserDto updateDto = new UpdateUserDto();
         updateDto.setName("Ivan");
         updateDto.setSurname("Vanusha");
-        updateDto.setEmail("Vanusha@example.com");
         updateDto.setBirthDate(LocalDate.of(2000, 1, 1));
         updateDto.setCards(null); // null карты
 
-        // when
-        UserDto result = userService.updateUser(1L, updateDto);
+        // when - используем email пользователя из мока
+        UserDto result = userService.updateUser(1L, updateDto, "masha@gmail.com");
 
         // then
         assertNotNull(result);

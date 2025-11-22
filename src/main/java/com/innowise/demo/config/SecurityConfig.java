@@ -7,6 +7,7 @@ import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -31,8 +32,11 @@ public class SecurityConfig {
 
     /**
      * Настраивает Security Filter Chain для работы с JWT токенами.
-     * Endpoint /api/v1/users/self требует аутентификации (токен из auth-service).
-     * Остальные endpoints также требуют аутентификации.
+     * 
+     * Правила доступа:
+     * - ADMIN: доступ ко всем эндпоинтам
+     * - USER: доступ только к своим ресурсам (проверка в контроллерах)
+     * - Публичные эндпоинты: /actuator/health, /actuator/info
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -40,10 +44,24 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Публичные эндпоинты
+                        .requestMatchers("/actuator/health", "/actuator/info").hasRole("ADMIN")
+                        
+                        // Эндпоинты только для ADMIN
                         .requestMatchers("/api/cache/**").hasRole("ADMIN")
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                        .requestMatchers("/api/v1/users/sync").permitAll()
+                        
+                        // Эндпоинты для получения списка всех пользователей - только ADMIN
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users").hasRole("ADMIN")
+                        
+                        // Эндпоинты для создания пользователя администратором - только ADMIN
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users").hasRole("ADMIN")
+                        
+                        // Эндпоинт для создания пользователя из токена - требует аутентификации
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/self").hasAnyRole("ADMIN", "USER")
+                        
+                        // Остальные эндпоинты требуют аутентификации (проверка доступа в контроллерах)
                         .requestMatchers("/api/v1/users/**", "/api/v1/cards/**").hasAnyRole("ADMIN", "USER")
+                        
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

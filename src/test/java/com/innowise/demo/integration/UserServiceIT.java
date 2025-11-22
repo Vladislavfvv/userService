@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import com.innowise.demo.dto.UpdateUserDto;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.UserMapper;
@@ -93,16 +94,15 @@ class UserServiceIT extends BaseIntegrationTest{
     void updateUser_ShouldModifyData() {
         User saved = userRepository.save(userMapper.toEntity(userDto));
 
-        UserDto updateDto = new UserDto();
+        UpdateUserDto updateDto = new UpdateUserDto();
         updateDto.setName("Updated");
         updateDto.setSurname("User");
-        updateDto.setEmail("updated@example.com");
         updateDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
-        UserDto updated = userService.updateUser(saved.getId(), updateDto);
+        UserDto updated = userService.updateUser(saved.getId(), updateDto, saved.getEmail());
 
         assertEquals("Updated", updated.getName());
-        assertEquals("updated@example.com", updated.getEmail());
+        assertEquals(saved.getEmail(), updated.getEmail()); // email не меняется, берется из токена
     }
 
     @Test

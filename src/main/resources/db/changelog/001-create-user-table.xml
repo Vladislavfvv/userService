@@ -1,9 +1,9 @@
-<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+ меня<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
 
-    <changeSet id="001-users-table" author="Filimontsev_VV">
+    <changeSet id="001-users-table" author="vlad">
         <preConditions onFail="MARK_RAN">
             <not>
                 <tableExists tableName="users"/>

@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.innowise.demo.dto.PagedUserResponse;
+import com.innowise.demo.dto.UpdateUserDto;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.exception.UserAlreadyExistsException;
 import com.innowise.demo.exception.UserNotFoundException;
@@ -214,10 +215,9 @@ class UserControllerTest {
     @DisplayName("PUT /api/v1/users/1 - успешное обновление пользователя")
     void updateUser_ShouldReturnUpdatedUser() throws Exception {
         // given
-        UserDto updateDto = new UserDto();
+        UpdateUserDto updateDto = new UpdateUserDto();
         updateDto.setName("Updated");
         updateDto.setSurname("User");
-        updateDto.setEmail("updated@example.com");
         updateDto.setBirthDate(LocalDate.of(1995, 5, 5));
 
         UserDto updatedDto = new UserDto();
@@ -227,7 +227,7 @@ class UserControllerTest {
         updatedDto.setEmail("updated@example.com");
         updatedDto.setBirthDate(LocalDate.of(1995, 5, 5));
 
-        when(userService.updateUser(eq(1L), any(UserDto.class))).thenReturn(updatedDto);
+        when(userService.updateUser(eq(1L), any(UpdateUserDto.class), any(String.class))).thenReturn(updatedDto);
 
         // when & then
         mockMvc.perform(put("/api/v1/users/1")
@@ -243,13 +243,12 @@ class UserControllerTest {
     @DisplayName("PUT /api/v1/users/999 - пользователь не найден для обновления")
     void updateUser_ShouldReturnNotFound_WhenUserNotFound() throws Exception {
         // given
-        UserDto updateDto = new UserDto();
+        UpdateUserDto updateDto = new UpdateUserDto();
         updateDto.setName("Updated");
         updateDto.setSurname("User");
-        updateDto.setEmail("updated@example.com");
         updateDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
-        when(userService.updateUser(eq(999L), any(UserDto.class)))
+        when(userService.updateUser(eq(999L), any(UpdateUserDto.class), any(String.class)))
                 .thenThrow(new UserNotFoundException("User with id 999 not found!"));
 
         // when & then
@@ -260,19 +259,27 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/users/1 - валидация: некорректный email")
-    void updateUser_ShouldReturnBadRequest_WhenEmailInvalid() throws Exception {
+    @DisplayName("PUT /api/v1/users/1 - доступ запрещен при неверном email")
+    void updateUser_ShouldReturnForbidden_WhenAccessDenied() throws Exception {
         // given
-        UserDto invalidDto = new UserDto();
-        invalidDto.setName("Test");
-        invalidDto.setEmail("invalid-email"); // невалидный email
+        UpdateUserDto updateDto = new UpdateUserDto();
+        updateDto.setName("Updated");
+
+        when(userService.updateUser(eq(1L), any(UpdateUserDto.class), any(String.class)))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException(
+                    "Access denied: You can only update your own information. Please, change Id in url."));
 
         // when & then
         mockMvc.perform(put("/api/v1/users/1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidDto)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(updateDto)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+                .andExpect(jsonPath("$.message").exists());
     }
+
+    // Тест с валидацией email удален, так как email больше не передается в UpdateUserDto
+    // Email берется из токена и не может быть изменен через этот endpoint
 
     @Test
     @DisplayName("DELETE /api/v1/users/1 - успешное удаление пользователя")

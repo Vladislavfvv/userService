@@ -3,10 +3,10 @@
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
                        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
 
-    <changeSet id="003-card-info-table" author="Filimontsev_VV">
+    <changeSet id="003-card-info-table" author="vlad">
         <preConditions onFail="MARK_RAN">
             <not>
-                <tableExists tableName="card-info"/>
+                <tableExists tableName="card_info" schemaName="public"/>
             </not>
         </preConditions>
 

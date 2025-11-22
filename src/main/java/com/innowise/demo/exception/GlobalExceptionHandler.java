@@ -3,6 +3,7 @@ package com.innowise.demo.exception;
 import org.apache.coyote.BadRequestException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -25,6 +26,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CardInfoNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleCardInfoNotFound(CardInfoNotFoundException ex) {
         return buildErrorResponse("CARD_NOT_FOUND", ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(CardAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleCardAlreadyExists(CardAlreadyExistsException ex) {
+        return buildErrorResponse("CARD_ALREADY_EXISTS", ex.getMessage(), HttpStatus.CONFLICT);
     }
 
     // ================= Validation & Bad Request =================
@@ -51,6 +57,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException ex) {
         return buildErrorResponse("RESOURCE_NOT_FOUND", ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
+
+    // ================= Access Denied =================
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        return buildErrorResponse("ACCESS_DENIED", ex.getMessage(), HttpStatus.FORBIDDEN);
     }
 
     // ================= Fallback =================
