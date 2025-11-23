@@ -11,10 +11,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 public class SecurityUtils {
 
     /**
-     * Проверяет, является ли текущий пользователь администратором.
-     * 
-     * @param authentication объект аутентификации
-     * @return true, если пользователь имеет роль ADMIN
+     * Проверяет, является ли пользователь администратором.
+     * Возвращает true, если пользователь имеет роль ADMIN.
      */
     public static boolean isAdmin(Authentication authentication) {
         if (authentication == null) {
@@ -26,12 +24,8 @@ public class SecurityUtils {
     }
 
     /**
-     * Извлекает email пользователя из JWT токена.
-     * Email находится в claim "sub" (subject) токена.
-     * 
-     * @param authentication объект аутентификации
-     * @return email пользователя из токена
-     * @throws IllegalStateException если токен не содержит email
+     * Извлекает email пользователя из JWT токена (claim "sub").
+     * Выбрасывает IllegalStateException, если токен не содержит email.
      */
     public static String getEmailFromToken(Authentication authentication) {
         if (authentication == null) {
@@ -53,9 +47,7 @@ public class SecurityUtils {
 
     /**
      * Извлекает JWT из Authentication объекта.
-     * 
-     * @param authentication объект аутентификации
-     * @return JWT токен или null, если не удалось извлечь
+     * Возвращает JWT токен или null, если не удалось извлечь.
      */
     private static Jwt extractJwt(Authentication authentication) {
         if (authentication instanceof JwtAuthenticationToken jwtAuthenticationToken) {
@@ -68,25 +60,19 @@ public class SecurityUtils {
     }
 
     /**
-     * Проверяет, имеет ли пользователь доступ к ресурсу.
-     * ADMIN имеет доступ ко всем ресурсам.
-     * USER имеет доступ только к своим ресурсам (проверка по email).
-     * 
-     * @param authentication объект аутентификации
-     * @param resourceOwnerEmail email владельца ресурса
-     * @return true, если пользователь имеет доступ к ресурсу
+     * Проверяет доступ пользователя к ресурсу.
+     * ADMIN имеет доступ ко всем ресурсам, USER - только к своим (проверка по email).
+     * Возвращает true, если пользователь имеет доступ к ресурсу.
      */
     public static boolean hasAccess(Authentication authentication, String resourceOwnerEmail) {
         if (authentication == null) {
             return false;
         }
 
-        // ADMIN имеет доступ ко всем ресурсам
         if (isAdmin(authentication)) {
             return true;
         }
 
-        // USER имеет доступ только к своим ресурсам
         try {
             String userEmail = getEmailFromToken(authentication);
             return userEmail.equals(resourceOwnerEmail);

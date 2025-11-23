@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * DTO для создания пользователя из JWT токена.
- * Email извлекается из токена (claim "sub"), поэтому не требуется в запросе.
+ * Email извлекается из токена, поэтому не требуется в запросе.
  */
 @Data
 @NoArgsConstructor

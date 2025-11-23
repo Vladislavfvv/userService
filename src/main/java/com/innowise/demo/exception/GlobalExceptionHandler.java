@@ -8,6 +8,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/**
+ * Обработчик глобальных исключений для всех контроллеров в приложении.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -63,6 +66,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
         return buildErrorResponse("ACCESS_DENIED", ex.getMessage(), HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
+        // Если это ошибка связанная с отсутствием email в токене, возвращаем 403
+        String message = ex.getMessage();
+        if (message != null && (message.contains("Email") || message.contains("token") || message.contains("Authentication"))) {
+            return buildErrorResponse("ACCESS_DENIED", "Access denied: You can only update your own information.", HttpStatus.FORBIDDEN);
+        }
+        return buildErrorResponse("BAD_REQUEST", message != null ? message : "Illegal state", HttpStatus.BAD_REQUEST);
     }
 
     // ================= Fallback =================

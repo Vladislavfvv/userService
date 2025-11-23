@@ -74,23 +74,36 @@ class CardInfoServiceTest {
 
     @Test
     void getCardInfoById_Exists_ReturnsDto() {
+        // given
+        // Создаём тестовые объекты для проверки получения карты по ID
         CardInfo cardInfo = new CardInfo();
         cardInfo.setId(1L);
         CardInfoDto dto = new CardInfoDto();
         dto.setId(1L);
 
+        //when
+        // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с cardInfo
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(cardInfo));
+        // Когда кто-то вызовет cardInfoMapper.toDto(cardInfo), верни dto
         when(cardInfoMapper.toDto(cardInfo)).thenReturn(dto);
 
+        // Вызываем тестируемый метод
         CardInfoDto result = cardInfoService.getCardInfoById(1L);
-        assertNotNull(result);
-        assertEquals(1L, result.getId());
+
+        // then
+        assertNotNull(result); // Проверка: что результат не null
+        assertEquals(1L, result.getId()); // Проверка: что ID карты совпадает
     }
 
     @Test
     void getCardInfoById_NotFound_ThrowsException() {
+        // given & when
+        // Когда кто-то вызовет cardInfoRepository.findById(1L), верни пустой Optional
+        // Это имитирует ситуацию, когда карты с таким ID не существует в базе данных
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.empty());
 
+        // then
+        // Проверка: что метод выбросит исключение CardInfoNotFoundException
         assertThrows(CardInfoNotFoundException.class, () -> cardInfoService.getCardInfoById(1L));
     }
 
@@ -99,27 +112,40 @@ class CardInfoServiceTest {
     @Test
     void save_ShouldReturnCardDto_WhenUserExists() {
         // given
+        // Когда кто-то вызовет userRepository.findById(1L), верни Optional с user
+        // (это нужно для проверки существования пользователя перед сохранением карты)
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        // Когда кто-то вызовет cardInfoMapper.toEntity(cardDto), верни card
+        // (преобразование DTO в сущность для сохранения в БД)
         when(cardInfoMapper.toEntity(cardDto)).thenReturn(card);
+        // Когда кто-то вызовет cardInfoRepository.save(card), верни card
+        // (имитация сохранения карты в БД)
         when(cardInfoRepository.save(card)).thenReturn(card);
+        // Когда кто-то вызовет cardInfoMapper.toDto(card), верни cardDto
+        // (преобразование сущности обратно в DTO для возврата клиенту)
         when(cardInfoMapper.toDto(card)).thenReturn(cardDto);
 
-        // when
+        //when
+        // Вызываем тестируемый метод сохранения карты
         CardInfoDto result = cardInfoService.save(cardDto);
 
         // then
-        assertNotNull(result);
-        assertEquals(cardDto.getNumber(), result.getNumber());
-        verify(cardInfoRepository, times(1)).save(card);
+        assertNotNull(result); // Проверка: что результат не null
+        assertEquals(cardDto.getNumber(), result.getNumber()); // Проверка: что номер карты совпадает
+        verify(cardInfoRepository, times(1)).save(card); // Проверка: что метод save был вызван ровно 1 раз
     }
 
     @DisplayName("saveCardInfo_Negative")
     @Test
     void save_ShouldThrow_WhenUserNotFound() {
-        // given
+        // given & when
+        // Когда кто-то вызовет userRepository.findById(1L), верни пустой Optional
+        // Это имитирует ситуацию, когда пользователя с таким ID не существует в базе данных
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
 
-        // when & then
+        // then
+        // Проверка: что метод выбросит исключение UserNotFoundException
+        // (нельзя сохранить карту для несуществующего пользователя)
         assertThrows(UserNotFoundException.class, () -> cardInfoService.save(cardDto));
     }
 
@@ -128,15 +154,20 @@ class CardInfoServiceTest {
     @Test
     void getCardInfoById_ShouldReturnCardDto_WhenExists() {
         // given
+        // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
+        // (это объект, созданный в setUp() с данными карты)
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
+        // Когда кто-то вызовет cardInfoMapper.toDto(card), верни cardDto
+        // (преобразование сущности в DTO для возврата клиенту)
         when(cardInfoMapper.toDto(card)).thenReturn(cardDto);
 
-        // when
+        //when
+        // Вызываем тестируемый метод получения карты по ID
         CardInfoDto result = cardInfoService.getCardInfoById(1L);
 
         // then
-        assertNotNull(result);
-        assertEquals(card.getNumber(), result.getNumber());
+        assertNotNull(result); // Проверка: что результат не null
+        assertEquals(card.getNumber(), result.getNumber()); // Проверка: что номер карты совпадает
     }
 
     // ----------------- getAllCardInfos -----------------
@@ -144,27 +175,38 @@ class CardInfoServiceTest {
     @Test
     void getAllCardInfos_ShouldReturnPage() {
         // given
+        // Создаём список карт с одной картой внутри (card из setUp())
         List<CardInfo> cards = List.of(card);
+        // Создаём объект Page с одной картой (страница 0, размер страницы 5)
+        // PageImpl — это реализация интерфейса Page от Spring Data
         Page<CardInfo> page = new PageImpl<>(cards, PageRequest.of(0, 5), cards.size());
+
+        //when
+        // Когда кто-то вызовет cardInfoRepository.findAll(PageRequest.of(0, 5)), верни этот объект page
         when(cardInfoRepository.findAll(PageRequest.of(0, 5))).thenReturn(page);
+        // Когда кто-то вызовет cardInfoMapper.toDto(card), верни cardDto
         when(cardInfoMapper.toDto(card)).thenReturn(cardDto);
 
-        // when
+        // Вызываем тестируемый метод получения всех карт с пагинацией
         Page<CardInfoDto> result = cardInfoService.getAllCardInfos(0, 5);
 
         // then
-        assertNotNull(result);
-        assertEquals(1, result.getContent().size());
+        assertNotNull(result); // Проверка: что результат не null
+        assertEquals(1, result.getContent().size()); // Проверка: что в результате 1 карта
     }
 
     @DisplayName("getALLCardInfo_Negative")
     @Test
     void getAllCardInfos_ShouldThrow_WhenEmpty() {
-        // given
+        // given & when
+        // Создаём пустую страницу — это имитирует ситуацию, когда в базе данных нет карт
         Page<CardInfo> emptyPage = Page.empty();
+        // Когда кто-то вызовет cardInfoRepository.findAll(PageRequest.of(0, 10)), верни пустую страницу
         when(cardInfoRepository.findAll(PageRequest.of(0, 10))).thenReturn(emptyPage);
 
-        // when & then
+        // then
+        // Проверка: что метод выбросит исключение CardInfoNotFoundException
+        // (нельзя получить список карт, если их нет в базе данных)
         assertThrows(CardInfoNotFoundException.class, () -> cardInfoService.getAllCardInfos(0, 10));
     }
 
@@ -172,14 +214,19 @@ class CardInfoServiceTest {
     @Test
     void updateCardInfo_ShouldReturnUpdatedDto() {
         // given
+        // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
+        // (это нужно для получения существующей карты перед обновлением)
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
+        // Когда кто-то вызовет userRepository.findById(1L), верни Optional с user
+        // (это нужно для проверки существования пользователя)
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
-        // Мок save просто возвращает объект, который передаем
-        //save через thenAnswer возвращает объект, который реально был передан, чтобы имитировать сохранение
+        // Мок save через thenAnswer возвращает объект, который реально был передан
+        // Это имитирует сохранение: метод save возвращает тот же объект, который был передан
         when(cardInfoRepository.save(any(CardInfo.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        // Маппер теперь формирует DTO из текущего состояния объекта
+        // Маппер формирует DTO из текущего состояния объекта CardInfo
+        // Это позволяет проверить, что данные действительно обновились
         when(cardInfoMapper.toDto(any(CardInfo.class))).thenAnswer(invocation -> {
             CardInfo c = invocation.getArgument(0);
             CardInfoDto dto = new CardInfoDto();
@@ -191,22 +238,23 @@ class CardInfoServiceTest {
             return dto;
         });
 
-        // Данные для обновления
+        // Создаём DTO с данными для обновления карты
         CardInfoDto updateDto = new CardInfoDto();
-        updateDto.setNumber("9999 8888 7777 6666");
-        updateDto.setHolder("Updated Holder");
-        updateDto.setExpirationDate(LocalDate.of(2035, 1, 1));
-        updateDto.setUserId(user.getId());
+        updateDto.setNumber("9999 8888 7777 6666"); // новый номер карты
+        updateDto.setHolder("Updated Holder"); // новое имя держателя
+        updateDto.setExpirationDate(LocalDate.of(2035, 1, 1)); // новая дата истечения
+        updateDto.setUserId(user.getId()); // ID пользователя остаётся прежним
 
-        // when
+        //when
+        // Вызываем тестируемый метод обновления карты
         CardInfoDto result = cardInfoService.updateCardInfo(1L, updateDto);
 
         // then
-        assertNotNull(result);
-        assertEquals("9999 8888 7777 6666", result.getNumber());
-        assertEquals("Updated Holder", result.getHolder());
-        assertEquals(LocalDate.of(2035, 1, 1), result.getExpirationDate());
-        verify(cardInfoRepository, times(1)).save(any(CardInfo.class));
+        assertNotNull(result); // Проверка: что результат не null
+        assertEquals("9999 8888 7777 6666", result.getNumber()); // Проверка: что номер обновился
+        assertEquals("Updated Holder", result.getHolder()); // Проверка: что имя держателя обновилось
+        assertEquals(LocalDate.of(2035, 1, 1), result.getExpirationDate()); // Проверка: что дата обновилась
+        verify(cardInfoRepository, times(1)).save(any(CardInfo.class)); // Проверка: что метод save был вызван ровно 1 раз
     }
 
     // ----------------- deleteCardInfo -----------------
@@ -214,22 +262,30 @@ class CardInfoServiceTest {
     @Test
     void deleteCardInfo_ShouldCallDelete_WhenExists() {
         // given
+        // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
+        // (это нужно для проверки существования карты перед удалением)
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
 
-        // when
+        //when
+        // Вызываем тестируемый метод удаления карты
         cardInfoService.deleteCardInfo(1L);
 
         // then
+        // Проверка: что метод deleteById был вызван ровно 1 раз с аргументом 1L
         verify(cardInfoRepository, times(1)).deleteById(1L);
     }
 
     @DisplayName("updateCardInfo_NotFound")
     @Test
     void deleteCardInfo_ShouldThrow_WhenNotFound() {
-        // given
+        // given & when
+        // Когда кто-то вызовет cardInfoRepository.findById(1L), верни пустой Optional
+        // Это имитирует ситуацию, когда карты с таким ID не существует в базе данных
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.empty());
 
-        // when & then
+        // then
+        // Проверка: что метод выбросит исключение CardInfoNotFoundException
+        // (нельзя удалить карту, которой не существует)
         assertThrows(CardInfoNotFoundException.class, () -> cardInfoService.deleteCardInfo(1L));
     }
 
@@ -239,13 +295,19 @@ class CardInfoServiceTest {
     @Test
     void updateCardInfo_WithDifferentUserId_ShouldUpdateUser() {
         // given
+        // Создаём нового пользователя с другим ID для проверки смены владельца карты
         User newUser = new User();
         newUser.setId(2L);
 
+        // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
+        // Когда кто-то вызовет userRepository.findById(2L), верни Optional с newUser
+        // (это нужно для получения нового пользователя при смене владельца карты)
         when(userRepository.findById(2L)).thenReturn(Optional.of(newUser));
 
+        // Мок save возвращает объект, который был передан
         when(cardInfoRepository.save(any(CardInfo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Маппер формирует DTO из текущего состояния объекта CardInfo
         when(cardInfoMapper.toDto(any(CardInfo.class))).thenAnswer(invocation -> {
             CardInfo c = invocation.getArgument(0);
             CardInfoDto dto = new CardInfoDto();
@@ -253,32 +315,37 @@ class CardInfoServiceTest {
             dto.setNumber(c.getNumber());
             dto.setHolder(c.getHolder());
             dto.setExpirationDate(c.getExpirationDate());
-            dto.setUserId(c.getUser().getId());
+            dto.setUserId(c.getUser().getId()); // userId берётся из обновлённого объекта
             return dto;
         });
 
+        // Создаём DTO с данными для обновления карты, включая новый userId
         CardInfoDto updateDto = new CardInfoDto();
         updateDto.setNumber("9999 8888 7777 6666");
         updateDto.setHolder("Updated Holder");
         updateDto.setExpirationDate(LocalDate.of(2035, 1, 1));
-        updateDto.setUserId(2L); // новый userId
+        updateDto.setUserId(2L); // новый userId — карта переходит к другому пользователю
 
-        // when
+        //when
+        // Вызываем тестируемый метод обновления карты с новым userId
         CardInfoDto result = cardInfoService.updateCardInfo(1L, updateDto);
 
         // then
-        assertNotNull(result);
-        assertEquals(2L, result.getUserId());
-        verify(cardInfoRepository, times(1)).save(any(CardInfo.class));
-        verify(userRepository, times(1)).findById(2L);
+        assertNotNull(result); // Проверка: что результат не null
+        assertEquals(2L, result.getUserId()); // Проверка: что userId изменился на 2L
+        verify(cardInfoRepository, times(1)).save(any(CardInfo.class)); // Проверка: что метод save был вызван ровно 1 раз
+        verify(userRepository, times(1)).findById(2L); // Проверка: что метод findById был вызван для нового пользователя
     }
 
     @DisplayName("updateCardInfo_WithSameUserId_ShouldNotUpdateUser")
     @Test
     void updateCardInfo_WithSameUserId_ShouldNotUpdateUser() {
         // given
+        // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
+        // Мок save возвращает объект, который был передан
         when(cardInfoRepository.save(any(CardInfo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Маппер формирует DTO из текущего состояния объекта CardInfo
         when(cardInfoMapper.toDto(any(CardInfo.class))).thenAnswer(invocation -> {
             CardInfo c = invocation.getArgument(0);
             CardInfoDto dto = new CardInfoDto();
@@ -290,20 +357,23 @@ class CardInfoServiceTest {
             return dto;
         });
 
+        // Создаём DTO с данными для обновления карты, но с тем же userId
         CardInfoDto updateDto = new CardInfoDto();
         updateDto.setNumber("9999 8888 7777 6666");
         updateDto.setHolder("Updated Holder");
         updateDto.setExpirationDate(LocalDate.of(2035, 1, 1));
-        updateDto.setUserId(1L); // тот же userId
+        updateDto.setUserId(1L); // тот же userId — владелец карты не меняется
 
-        // when
+        //when
+        // Вызываем тестируемый метод обновления карты с тем же userId
         CardInfoDto result = cardInfoService.updateCardInfo(1L, updateDto);
 
         // then
-        assertNotNull(result);
-        assertEquals(1L, result.getUserId());
-        verify(cardInfoRepository, times(1)).save(any(CardInfo.class));
-        //не должен вызываться, если userId не изменился userRepository.findById
+        assertNotNull(result); // Проверка: что результат не null
+        assertEquals(1L, result.getUserId()); // Проверка: что userId остался прежним
+        verify(cardInfoRepository, times(1)).save(any(CardInfo.class)); // Проверка: что метод save был вызван ровно 1 раз
+        // Проверка: что метод findById НЕ был вызван для userRepository
+        // (если userId не изменился, нет необходимости искать пользователя в БД)
         verify(userRepository, never()).findById(any());
     }
 
@@ -311,8 +381,12 @@ class CardInfoServiceTest {
     @Test
     void updateCardInfo_WithNullUserId_ShouldNotUpdateUser() {
         // given
+        // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
+        // Мок save возвращает объект, который был передан
         when(cardInfoRepository.save(any(CardInfo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Маппер формирует DTO из текущего состояния объекта CardInfo
+        // Обрабатывает случай, когда user может быть null
         when(cardInfoMapper.toDto(any(CardInfo.class))).thenAnswer(invocation -> {
             CardInfo c = invocation.getArgument(0);
             CardInfoDto dto = new CardInfoDto();
@@ -324,18 +398,22 @@ class CardInfoServiceTest {
             return dto;
         });
 
+        // Создаём DTO с данными для обновления карты, но с null userId
         CardInfoDto updateDto = new CardInfoDto();
         updateDto.setNumber("9999 8888 7777 6666");
         updateDto.setHolder("Updated Holder");
         updateDto.setExpirationDate(LocalDate.of(2035, 1, 1));
-        updateDto.setUserId(null); // null userId
+        updateDto.setUserId(null); // null userId — владелец карты не указан
 
-        // when
+        //when
+        // Вызываем тестируемый метод обновления карты с null userId
         CardInfoDto result = cardInfoService.updateCardInfo(1L, updateDto);
 
         // then
-        assertNotNull(result);
-        verify(cardInfoRepository, times(1)).save(any(CardInfo.class));
+        assertNotNull(result); // Проверка: что результат не null
+        verify(cardInfoRepository, times(1)).save(any(CardInfo.class)); // Проверка: что метод save был вызван ровно 1 раз
+        // Проверка: что метод findById НЕ был вызван для userRepository
+        // (если userId равен null, нет необходимости искать пользователя в БД)
         verify(userRepository, never()).findById(any());
     }
 
