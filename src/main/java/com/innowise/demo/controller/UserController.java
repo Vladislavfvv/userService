@@ -60,7 +60,7 @@ public class UserController {
      * @param authentication объект аутентификации, содержащий JWT токен
      * @return созданный пользователь
      */
-    @PostMapping("/self")
+    @PostMapping("/createUser")
     public ResponseEntity<UserDto> createUserFromToken(
             @Valid @RequestBody CreateUserFromTokenRequest request,
             Authentication authentication) {

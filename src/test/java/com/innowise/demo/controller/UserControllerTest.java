@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.innowise.demo.dto.CreateUserFromTokenRequest;
 import com.innowise.demo.dto.PagedUserResponse;
 import com.innowise.demo.dto.UpdateUserDto;
 import com.innowise.demo.dto.UserDto;
@@ -379,6 +380,147 @@ class UserControllerTest {
             // then
             // Выполняем GET запрос на /api/v1/users/self с токеном без email
             mockMvc.perform(get("/api/v1/users/self")
+                            .principal(authentication))
+                    .andExpect(status().isForbidden()) // Проверка: что контроллер вернул 403 Forbidden
+                    .andExpect(jsonPath("$.code").value("ACCESS_DENIED")) // Проверка: код ошибки ACCESS_DENIED
+                    .andExpect(jsonPath("$.message").value("Access denied: You can only update your own information.")); // Проверка: сообщение об ошибке
+        }
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/users/createUser - успешное создание пользователя из токена")
+    void createUserFromToken_ShouldReturnCreatedUser() throws Exception {
+        // given
+        // Создаём DTO для запроса — данные, которые клиент отправляет на сервер
+        CreateUserFromTokenRequest requestDto = new CreateUserFromTokenRequest();
+        requestDto.setName("Test");
+        requestDto.setSurname("User");
+        requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
+
+        String email = "test@example.com";
+
+        //when
+        // Когда кто-то вызовет userService.createUserFromToken(email, requestDto), верни userDto
+        // (это объект, созданный в setUp() с данными пользователя)
+        when(userService.createUserFromToken(eq(email), any(CreateUserFromTokenRequest.class))).thenReturn(userDto);
+
+        // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            // Создаём мок аутентификации — как будто пользователь уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication(email, "USER");
+            // Когда метод SecurityUtils.getEmailFromToken(authentication) вызвается — возвращай email
+            // Это извлекает email из JWT токена для создания пользователя
+            mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
+                    .thenReturn(email);
+
+            // then
+            // Выполняем POST запрос на /api/v1/users/createUser с данными для создания пользователя
+            mockMvc.perform(post("/api/v1/users/createUser")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(requestDto))
+                            .principal(authentication))
+                    .andExpect(status().isOk()) // Проверка: что контроллер вернул 200 OK
+                    .andExpect(jsonPath("$.id").value(1L)) // Проверка: JSON содержит правильный ID
+                    .andExpect(jsonPath("$.name").value("Test")) // Проверка: имя совпадает
+                    .andExpect(jsonPath("$.email").value("test@example.com")); // Проверка: email совпадает
+        }
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/users/createUser - валидация: пустое имя")
+    void createUserFromToken_ShouldReturnBadRequest_WhenNameIsBlank() throws Exception {
+        // given
+        // Создаём DTO с невалидными данными — пустое имя
+        // Это проверяет, что Spring Validation (@NotBlank) работает корректно
+        CreateUserFromTokenRequest invalidDto = new CreateUserFromTokenRequest();
+        invalidDto.setName(""); // пустое имя — это нарушает валидацию @NotBlank
+        invalidDto.setSurname("User");
+        invalidDto.setBirthDate(LocalDate.of(1990, 1, 1));
+
+        //when
+        // Валидация произойдет до вызова сервиса — Spring вернёт 400 Bad Request
+        // ещё до того, как контроллер попытается создать пользователя
+
+        // then
+        // Выполняем POST запрос с невалидными данными
+        mockMvc.perform(post("/api/v1/users/createUser")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidDto)))
+                .andExpect(status().isBadRequest()); // Проверка: что Spring Validation отклонил запрос
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/users/createUser - пользователь уже существует")
+    void createUserFromToken_ShouldReturnConflict_WhenUserAlreadyExists() throws Exception {
+        // given
+        // Создаём DTO для запроса — данные, которые клиент отправляет на сервер
+        CreateUserFromTokenRequest requestDto = new CreateUserFromTokenRequest();
+        requestDto.setName("Test");
+        requestDto.setSurname("User");
+        requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
+
+        String email = "test@example.com";
+
+        //when
+        // Когда кто-то вызовет userService.createUserFromToken(email, requestDto), выбрось исключение
+        // Это имитирует ситуацию, когда пользователь с таким email уже существует в базе данных
+        when(userService.createUserFromToken(eq(email), any(CreateUserFromTokenRequest.class)))
+                .thenThrow(new UserAlreadyExistsException("User with email test@example.com already exists"));
+
+        // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            // Создаём мок аутентификации — как будто пользователь уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication(email, "USER");
+            // Когда метод SecurityUtils.getEmailFromToken(authentication) вызвается — возвращай email
+            mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
+                    .thenReturn(email);
+
+            // then
+            // Выполняем POST запрос на создание пользователя, который уже существует
+            mockMvc.perform(post("/api/v1/users/createUser")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(requestDto))
+                            .principal(authentication))
+                    .andExpect(status().isConflict()); // Проверка: что контроллер вернул 409 Conflict
+        }
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/users/createUser - токен без email")
+    void createUserFromToken_ShouldReturnForbidden_WhenTokenHasNoEmail() throws Exception {
+        // given
+        // Создаём DTO для запроса
+        CreateUserFromTokenRequest requestDto = new CreateUserFromTokenRequest();
+        requestDto.setName("Test");
+        requestDto.setSurname("User");
+        requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
+
+        //when
+        // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            // Создаём токен без email (без claim "sub") — это невалидный токен для этого endpoint
+            Jwt jwt = Jwt.withTokenValue("mock-token")
+                    .header("alg", "HS256")
+                    .claim("role", "USER")
+                    .issuedAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(3600))
+                    .build();
+
+            JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+                    jwt,
+                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+            );
+
+            // Когда метод SecurityUtils.getEmailFromToken(authentication) вызвается — выбрось исключение
+            // Это имитирует ситуацию, когда в токене отсутствует claim "sub" с email
+            mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
+                    .thenThrow(new IllegalStateException("Email (sub claim) not found in JWT token"));
+
+            // then
+            // Выполняем POST запрос на /api/v1/users/createUser с токеном без email
+            mockMvc.perform(post("/api/v1/users/createUser")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(requestDto))
                             .principal(authentication))
                     .andExpect(status().isForbidden()) // Проверка: что контроллер вернул 403 Forbidden
                     .andExpect(jsonPath("$.code").value("ACCESS_DENIED")) // Проверка: код ошибки ACCESS_DENIED
