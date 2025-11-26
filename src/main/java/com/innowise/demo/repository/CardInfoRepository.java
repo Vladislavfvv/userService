@@ -2,6 +2,8 @@ package com.innowise.demo.repository;
 
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,4 +28,11 @@ public interface CardInfoRepository extends JpaRepository<CardInfo, Long> {
      */
     @Query("SELECT c FROM CardInfo c WHERE c.number = :number")
     Optional<CardInfo> findByNumber(@Param("number") String number);
+
+    /**
+     * Находит все карты пользователя по email (без учета регистра) с пагинацией.
+     * Используется для получения списка карт текущего пользователя.
+     */
+    @Query("SELECT c FROM CardInfo c WHERE LOWER(c.user.email) = LOWER(:email)")
+    Page<CardInfo> findAllByUser_EmailIgnoreCase(@Param("email") String email, Pageable pageable);
 }
