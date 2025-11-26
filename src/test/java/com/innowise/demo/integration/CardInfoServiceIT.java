@@ -1,6 +1,8 @@
 package com.innowise.demo.integration;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collections;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
@@ -10,6 +12,12 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.exception.CardInfoNotFoundException;
@@ -24,6 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -59,6 +69,28 @@ class CardInfoServiceIT extends BaseIntegrationTest{
 
     // Тестовые данные, создаваемые в setUp()
     private CardInfoDto cardDto;
+    private String testUserEmail = "carduser@example.com";
+
+    private JwtAuthenticationToken createMockAuthentication(String email, String role) {
+        Jwt jwt = Jwt.withTokenValue("mock-token")
+                .header("alg", "HS256")
+                .claim("sub", email)
+                .claim("email", email)
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+
+        return new JwtAuthenticationToken(
+                jwt,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
+        );
+    }
+
+    private void mockSecurityContext(Authentication authentication) {
+        SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        SecurityContextHolder.setContext(securityContext);
+    }
 
     @BeforeEach
     void setUp() {
@@ -67,17 +99,25 @@ class CardInfoServiceIT extends BaseIntegrationTest{
         cardInfoRepository.deleteAll();
         userRepository.deleteAll();
 
+        // Мокируем аутентификацию для ADMIN (чтобы можно было создавать пользователей)
+        JwtAuthenticationToken adminAuth = createMockAuthentication("admin@example.com", "ADMIN");
+        mockSecurityContext(adminAuth);
+
         // Создаём тестового пользователя для использования в тестах карт
         // Карты должны принадлежать пользователю, поэтому сначала создаём пользователя
         UserDto userDto = new UserDto();
         userDto.setName("Integration");
         userDto.setSurname("CardTest");
-        userDto.setEmail("carduser@example.com");
+        userDto.setEmail(testUserEmail);
         userDto.setBirthDate(LocalDate.of(1995, 5, 5));
 
         // Сохраняем пользователя через сервис в реальную БД
         // В интеграционных тестах мы работаем с реальной базой данных через Testcontainers
         UserDto savedUser = userService.createUser(userDto);
+
+        // Мокируем аутентификацию для USER (для работы с картами)
+        JwtAuthenticationToken userAuth = createMockAuthentication(testUserEmail, "USER");
+        mockSecurityContext(userAuth);
 
         // Создаём тестовый DTO карты, привязанной к созданному пользователю
         cardDto = new CardInfoDto();
@@ -139,12 +179,14 @@ class CardInfoServiceIT extends BaseIntegrationTest{
     @Order(4)
     void getAllCardInfos_ShouldReturnPagedList() {
         // given
+        // Убеждаемся, что аутентификация установлена для USER (установлена в setUp)
         // Сохраняем карту через сервис в реальную БД
         cardInfoService.save(cardDto);
 
         //when
         // Вызываем тестируемый метод получения всех карт с пагинацией
         // В интеграционном тесте это реальный запрос к базе данных с пагинацией
+        // Для USER используется findAllByUser_EmailIgnoreCase
         Page<CardInfoDto> page = cardInfoService.getAllCardInfos(0, 10);
 
         // then
@@ -158,6 +200,10 @@ class CardInfoServiceIT extends BaseIntegrationTest{
     @Order(5)
     void getAllCardInfos_Empty_ShouldThrowException() {
         // given
+        // Мокируем аутентификацию для ADMIN (чтобы использовался findAll)
+        JwtAuthenticationToken adminAuth = createMockAuthentication("admin@example.com", "ADMIN");
+        mockSecurityContext(adminAuth);
+        
         // База данных пуста (очищена в setUp()), карт нет
 
         //when & then
