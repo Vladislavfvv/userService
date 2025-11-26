@@ -1,7 +1,7 @@
 services:
-  postgres:
+  us_db:
     image: postgres:16
-    container_name: us_db_pg
+    container_name: us_db
     restart: always
     environment:
       POSTGRES_DB: us_db
@@ -15,7 +15,7 @@ services:
     networks:
       - backend-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres  -d us_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d us_db"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -37,16 +37,16 @@ services:
     networks:
       - backend-network
 
-  user_service:
+  user-service:
     build: .
-    container_name: user_service
+    container_name: user-service
     depends_on:
-      postgres:
+      us_db:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/us_db
+      SPRING_DATASOURCE_URL: jdbc:postgresql://us_db:5432/us_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_REDIS_HOST: redis
@@ -64,4 +64,5 @@ volumes:
 
 networks:
   backend-network:
-    driver: bridge
+    name: backend-network
+    external: true
