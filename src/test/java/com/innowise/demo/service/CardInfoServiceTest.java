@@ -1,6 +1,8 @@
 package com.innowise.demo.service;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +15,12 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import com.innowise.demo.dto.CardInfoDto;
 import com.innowise.demo.exception.CardInfoNotFoundException;
 import com.innowise.demo.exception.UserNotFoundException;
@@ -55,6 +63,7 @@ class CardInfoServiceTest {
 
         user = new User();
         user.setId(1L);
+        user.setEmail("test@example.com");
 
         card = new CardInfo();
         card.setId(1L);
@@ -72,14 +81,40 @@ class CardInfoServiceTest {
 
     }
 
+    private JwtAuthenticationToken createMockAuthentication(String email, String role) {
+        Jwt jwt = Jwt.withTokenValue("mock-token")
+                .header("alg", "HS256")
+                .claim("sub", email)
+                .claim("email", email)
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
+
+        return new JwtAuthenticationToken(
+                jwt,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
+        );
+    }
+
+    private void mockSecurityContext(Authentication authentication) {
+        SecurityContext securityContext = org.mockito.Mockito.mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        SecurityContextHolder.setContext(securityContext);
+    }
+
     @Test
     void getCardInfoById_Exists_ReturnsDto() {
         // given
         // Создаём тестовые объекты для проверки получения карты по ID
         CardInfo cardInfo = new CardInfo();
         cardInfo.setId(1L);
+        cardInfo.setUser(user);
         CardInfoDto dto = new CardInfoDto();
         dto.setId(1L);
+
+        // Мокируем аутентификацию
+        JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+        mockSecurityContext(authentication);
 
         //when
         // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с cardInfo
@@ -112,6 +147,10 @@ class CardInfoServiceTest {
     @Test
     void save_ShouldReturnCardDto_WhenUserExists() {
         // given
+        // Мокируем аутентификацию
+        JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+        mockSecurityContext(authentication);
+
         // Когда кто-то вызовет userRepository.findById(1L), верни Optional с user
         // (это нужно для проверки существования пользователя перед сохранением карты)
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
@@ -154,6 +193,10 @@ class CardInfoServiceTest {
     @Test
     void getCardInfoById_ShouldReturnCardDto_WhenExists() {
         // given
+        // Мокируем аутентификацию
+        JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+        mockSecurityContext(authentication);
+
         // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
         // (это объект, созданный в setUp() с данными карты)
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
@@ -175,6 +218,10 @@ class CardInfoServiceTest {
     @Test
     void getAllCardInfos_ShouldReturnPage() {
         // given
+        // Мокируем аутентификацию для ADMIN (чтобы использовался findAll)
+        JwtAuthenticationToken authentication = createMockAuthentication("admin@example.com", "ADMIN");
+        mockSecurityContext(authentication);
+
         // Создаём список карт с одной картой внутри (card из setUp())
         List<CardInfo> cards = List.of(card);
         // Создаём объект Page с одной картой (страница 0, размер страницы 5)
@@ -198,13 +245,17 @@ class CardInfoServiceTest {
     @DisplayName("getALLCardInfo_Negative")
     @Test
     void getAllCardInfos_ShouldThrow_WhenEmpty() {
-        // given & when
+        // given
+        // Мокируем аутентификацию для ADMIN (чтобы использовался findAll)
+        JwtAuthenticationToken authentication = createMockAuthentication("admin@example.com", "ADMIN");
+        mockSecurityContext(authentication);
+
         // Создаём пустую страницу — это имитирует ситуацию, когда в базе данных нет карт
         Page<CardInfo> emptyPage = Page.empty();
         // Когда кто-то вызовет cardInfoRepository.findAll(PageRequest.of(0, 10)), верни пустую страницу
         when(cardInfoRepository.findAll(PageRequest.of(0, 10))).thenReturn(emptyPage);
 
-        // then
+        //when & then
         // Проверка: что метод выбросит исключение CardInfoNotFoundException
         // (нельзя получить список карт, если их нет в базе данных)
         assertThrows(CardInfoNotFoundException.class, () -> cardInfoService.getAllCardInfos(0, 10));
@@ -214,6 +265,10 @@ class CardInfoServiceTest {
     @Test
     void updateCardInfo_ShouldReturnUpdatedDto() {
         // given
+        // Мокируем аутентификацию
+        JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+        mockSecurityContext(authentication);
+
         // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
         // (это нужно для получения существующей карты перед обновлением)
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
@@ -262,6 +317,10 @@ class CardInfoServiceTest {
     @Test
     void deleteCardInfo_ShouldCallDelete_WhenExists() {
         // given
+        // Мокируем аутентификацию
+        JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+        mockSecurityContext(authentication);
+
         // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
         // (это нужно для проверки существования карты перед удалением)
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
@@ -271,8 +330,10 @@ class CardInfoServiceTest {
         cardInfoService.deleteCardInfo(1L);
 
         // then
-        // Проверка: что метод deleteById был вызван ровно 1 раз с аргументом 1L
-        verify(cardInfoRepository, times(1)).deleteById(1L);
+        // Проверка: что метод findById был вызван для получения карты
+        verify(cardInfoRepository, times(1)).findById(1L);
+        // Проверка: что метод delete был вызван ровно 1 раз с объектом card
+        verify(cardInfoRepository, times(1)).delete(card);
     }
 
     @DisplayName("updateCardInfo_NotFound")
@@ -295,9 +356,14 @@ class CardInfoServiceTest {
     @Test
     void updateCardInfo_WithDifferentUserId_ShouldUpdateUser() {
         // given
+        // Мокируем аутентификацию для ADMIN (чтобы можно было менять владельца)
+        JwtAuthenticationToken authentication = createMockAuthentication("admin@example.com", "ADMIN");
+        mockSecurityContext(authentication);
+
         // Создаём нового пользователя с другим ID для проверки смены владельца карты
         User newUser = new User();
         newUser.setId(2L);
+        newUser.setEmail("newuser@example.com");
 
         // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
@@ -341,6 +407,10 @@ class CardInfoServiceTest {
     @Test
     void updateCardInfo_WithSameUserId_ShouldNotUpdateUser() {
         // given
+        // Мокируем аутентификацию
+        JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+        mockSecurityContext(authentication);
+
         // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
         // Мок save возвращает объект, который был передан
@@ -381,6 +451,10 @@ class CardInfoServiceTest {
     @Test
     void updateCardInfo_WithNullUserId_ShouldNotUpdateUser() {
         // given
+        // Мокируем аутентификацию
+        JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+        mockSecurityContext(authentication);
+
         // Когда кто-то вызовет cardInfoRepository.findById(1L), верни Optional с card
         when(cardInfoRepository.findById(1L)).thenReturn(Optional.of(card));
         // Мок save возвращает объект, который был передан
