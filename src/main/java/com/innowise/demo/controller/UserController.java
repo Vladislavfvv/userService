@@ -2,11 +2,9 @@ package com.innowise.demo.controller;
 
 import jakarta.validation.Valid;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,112 +14,164 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.innowise.demo.client.AuthServiceClient;
+import com.innowise.demo.dto.CreateUserFromTokenRequest;
 import com.innowise.demo.dto.PagedUserResponse;
+import com.innowise.demo.dto.UpdateUserDto;
 import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.service.UserService;
-import com.innowise.demo.dto.UserUpdateRequest;
+import com.innowise.demo.util.SecurityUtils;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.extern.slf4j.Slf4j;
 
-import java.util.Collection;
-import java.util.List;
-
+@Slf4j
 @RestController
-@RequestMapping({"/api/v1/users", "/api/users"})
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
-    private final AuthServiceClient authServiceClient;
-    
-    @Value("${authentication.service.internal-api-key:}")
-    private String internalApiKey;
 
     /**
-     * Эндпоинт для синхронизации пользователей из authentication-service
-     * Проверяет внутренний API ключ вместо роли
+     * Получение своих данных из JWT токена.
+     * Email извлекается из токена (claim "sub"), пользователь получает свои данные.
      * 
-     * ВАЖНО: Публичный эндпоинт POST /api/v1/users удален, чтобы предотвратить
-     * создание "фантомных" пользователей. Все пользователи должны создаваться
-     * через регистрацию в authentication-service, которая затем синхронизирует
-     * их через этот эндпоинт /sync.
+     * @param authentication объект аутентификации, содержащий JWT токен
+     * @return данные текущего пользователя
      */
-    @PostMapping("/sync")
-    public ResponseEntity<UserDto> syncUser(
-            @RequestHeader(value = "X-Internal-Api-Key", required = false) String apiKey,
-            @Valid @RequestBody UserDto dto) {
-        // Проверка внутреннего API ключа
-        if (internalApiKey == null || internalApiKey.isBlank() || !internalApiKey.equals(apiKey)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    @GetMapping("/self")
+    public ResponseEntity<UserDto> getSelfUser(Authentication authentication) {
+        log.info("Getting user data from token");
+        
+        // Извлекаем email из JWT токена
+        String email = SecurityUtils.getEmailFromToken(authentication);
+        log.debug("Extracted email from token: {}", email);
+        
+        // Получаем пользователя по email
+        UserDto userDto = userService.getUserByEmail(email);
+        return ResponseEntity.ok(userDto);
+    }
+
+    /**
+     * Создание пользователя из JWT токена.
+     * Email извлекается из токена (claim "sub"), остальные данные из тела запроса.
+     * Пользователь должен быть зарегистрирован в auth-service и иметь валидный JWT токен.
+     * 
+     * @param request данные пользователя (name, surname, birthDate)
+     * @param authentication объект аутентификации, содержащий JWT токен
+     * @return созданный пользователь
+     */
+    @PostMapping("/createUser")
+    public ResponseEntity<UserDto> createUserFromToken(
+            @Valid @RequestBody CreateUserFromTokenRequest request,
+            Authentication authentication) {
+        log.info("Creating user from token for authenticated user");
+        
+        // Извлекаем email из JWT токена
+        String email = SecurityUtils.getEmailFromToken(authentication);
+        log.debug("Extracted email from token: {}", email);
+        
+        // Создаем пользователя с email из токена
+        UserDto userDto = userService.createUserFromToken(email, request);
+        return ResponseEntity.ok(userDto);
+    }
+
+    @PostMapping
+    public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserDto dto) {
+        return ResponseEntity.ok(userService.createUser(dto));
+    }
+
+
+    /**
+     * Получение пользователя по ID.
+     * ADMIN: может получить любого пользователя.
+     * USER: может получить только свою информацию.
+     */
+    @GetMapping("/id")
+    public ResponseEntity<UserDto> getUserById(
+            @RequestParam Long id,
+            Authentication authentication) {
+        UserDto user = userService.findUserById(id);
+        
+        // Проверка доступа: USER может получить только свою информацию
+        if (!SecurityUtils.hasAccess(authentication, user.getEmail())) {
+            throw new AccessDeniedException("Access denied: You can only access your own information");
         }
         
-        // Создаем или возвращаем существующего пользователя
-        return ResponseEntity.ok(userService.syncUser(dto));
-    }
-
-    @GetMapping("/id")
-    public ResponseEntity<UserDto> getUserById(@RequestParam Long id) {
-        return ResponseEntity.ok(userService.findUserById(id));
+        return ResponseEntity.ok(user);
     }
 
     /**
-     * Получение всех пользователей с проверкой ролей из Keycloak токена.
-     * ROLE_ADMIN - может видеть всех пользователей
-     * ROLE_USER - может видеть только своих пользователей (логику нужно добавить)
+     * Получение списка всех пользователей.
+     * Доступно только для ADMIN (ограничение в SecurityConfig).
      */
     @GetMapping
     public ResponseEntity<PagedUserResponse> getUsers(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size,
-            Authentication authentication) {
-        
-        // Получить роли из Keycloak токена
-        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
-        
-        // Проверить роль
-        boolean isAdmin = authorities.stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        
-        if (isAdmin) {
-            // Администратор видит всех пользователей
-            return ResponseEntity.ok(userService.findAllUsers(page, size));
-        } else {
-            UserDto currentUser = userService.getCurrentUser(authentication);
-            PagedUserResponse response = new PagedUserResponse(
-                    List.of(currentUser),
-                    0,
-                    1,
-                    1,
-                    1
-            );
-            return ResponseEntity.ok(response);
-        }
+            @RequestParam(defaultValue = "5") int size) {
+        return ResponseEntity.ok(userService.findAllUsers(page, size));
     }
 
-    @GetMapping("/me")
-    public ResponseEntity<UserDto> getCurrentUser(Authentication authentication) {
-        return ResponseEntity.ok(userService.getCurrentUser(authentication));
-    }
-
-    //find user by email named
+    /**
+     * Получение пользователя по email.
+     * ADMIN: может получить любого пользователя.
+     * USER: может получить только свою информацию.
+     */
     @GetMapping("/email")
-    public  ResponseEntity<UserDto> getUserByEmail(@RequestParam(required = false) String email,
-                                                   @RequestHeader("Authorization") String authHeader) {
-        var validation = authServiceClient.validateAuthorizationHeader(authHeader);
-        if (validation.isEmpty() || !validation.get().valid()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    public ResponseEntity<UserDto> getUserByEmail(
+            @RequestParam(required = false) String email,
+            Authentication authentication) {
+        UserDto user = userService.getUserByEmail(email);
+        
+        // Проверка доступа: USER может получить только свою информацию
+        if (!SecurityUtils.hasAccess(authentication, user.getEmail())) {
+            throw new AccessDeniedException("Access denied: You can only access your own information");
         }
-        return ResponseEntity.ok(userService.getUserByEmail(email));
+        
+        return ResponseEntity.ok(user);
     }
 
+    /**
+     * Обновление пользователя.
+     * ADMIN: может обновить любого пользователя.
+     * USER: может обновить только свою информацию.
+     * Выполняет частичное обновление - обновляются только переданные поля.
+     * Email берется из токена, holder для карт автоматически формируется из name + surname.
+     * Проверка доступа выполняется в сервисе.
+     */
     @PutMapping("/{id}")
-    public ResponseEntity<UserDto> updateUser(@PathVariable Long id, @Valid @RequestBody UserUpdateRequest dto) {
-        return ResponseEntity.ok(userService.updateUser(id, dto));
+    public ResponseEntity<UserDto> updateUser(
+            @PathVariable Long id,
+            @RequestBody UpdateUserDto dto,
+            Authentication authentication) {
+        // Извлекаем email из токена для передачи в сервис
+        String userEmail;
+        try {
+            userEmail = SecurityUtils.getEmailFromToken(authentication);
+        } catch (IllegalStateException e) {
+            throw new AccessDeniedException("Access denied: You can only update your own information.");
+        }
+        
+        // Сервис сам проверит права доступа и выбросит исключение при необходимости
+        return ResponseEntity.ok(userService.updateUser(id, dto, userEmail));
     }
 
+    /**
+     * Удаление пользователя.
+     * ADMIN: может удалить любого пользователя.
+     * USER: может удалить только свою информацию.
+     */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable Long id,
+            Authentication authentication) {
+        // Получаем текущего пользователя для проверки доступа
+        UserDto currentUser = userService.findUserById(id);
+        
+        // Проверка доступа: USER может удалить только свою информацию
+        if (!SecurityUtils.hasAccess(authentication, currentUser.getEmail())) {
+            throw new AccessDeniedException("Access denied: You can only delete your own information");
+        }
+        
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }

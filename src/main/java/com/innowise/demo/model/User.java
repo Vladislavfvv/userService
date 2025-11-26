@@ -23,7 +23,7 @@ import lombok.Setter;
 @Setter
 @Getter
 @Entity
-@Table(name = "users")
+@Table(name = "users", schema = "public")
 
 @NoArgsConstructor
 @NamedQuery(

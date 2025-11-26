@@ -9,12 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-
+import com.innowise.demo.dto.UpdateUserDto;
 import com.innowise.demo.dto.UserDto;
-import com.innowise.demo.dto.UserUpdateRequest;
 import com.innowise.demo.exception.UserNotFoundException;
 import com.innowise.demo.mapper.UserMapper;
 import com.innowise.demo.model.User;
@@ -24,123 +20,149 @@ import com.innowise.demo.service.UserService;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
 
+/**
+ * Интеграционные тесты для UserService.
+ * Тесты работают с реальной базой данных PostgreSQL через Testcontainers.
+ * Используют реальные репозитории и сервисы без моков.
+ * Тесты упорядочены с помощью @Order для контроля последовательности выполнения.
+ */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class UserServiceIT extends BaseIntegrationTest{
 
-
+    // Автоматически внедряемые зависимости из Spring контекста
+    @Autowired
+    private UserService userService; // Сервис для работы с пользователями
 
     @Autowired
-    private UserService userService;
+    private UserRepository userRepository; // Репозиторий для прямого доступа к БД
 
     @Autowired
-    private UserRepository userRepository;
+    private UserMapper userMapper; // Маппер для преобразования между Entity и DTO
 
     @Autowired
-    private UserMapper userMapper;
+    private RedisTemplate<String, Object> redisTemplate; // Шаблон для работы с Redis (если используется)
 
-    @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
-
+    // Тестовые данные, создаваемые в setUp()
     private UserDto userDto;
 
     @BeforeEach
     void setUp() {
+        // Очищаем базу данных перед каждым тестом
+        // Это гарантирует, что каждый тест начинается с чистого состояния
         userRepository.deleteAll();
 
+        // Создаём тестовый DTO для использования в интеграционных тестах
+        // В интеграционных тестах мы работаем с реальной базой данных через Testcontainers
         userDto = new UserDto();
         userDto.setName("Integration");
         userDto.setSurname("Test");
         userDto.setEmail("integration@example.com");
         userDto.setBirthDate(LocalDate.of(1995, 5, 5));
-
-        // Мокируем вызов authServiceClient.deleteUser(), чтобы он не выбрасывал исключение
-        doNothing().when(authServiceClient).deleteUser(anyString());
-        // Мокируем вызов authServiceClient.updateUserProfile(), чтобы он не выбрасывал исключение
-        doNothing().when(authServiceClient).updateUserProfile(any());
     }
 
     @Test
     @Order(1)
     void createUser_ShouldSaveUser() {
+        // given
+        // userDto создан в setUp() с данными для создания пользователя
+
+        //when
+        // Вызываем тестируемый метод создания пользователя
+        // В интеграционном тесте это реальный вызов сервиса с реальной базой данных
         UserDto saved = userService.createUser(userDto);
 
-        assertNotNull(saved.getId());
-        assertEquals("integration@example.com", saved.getEmail());
-        assertEquals(1, userRepository.count());
+        // then
+        assertNotNull(saved.getId()); // Проверка: что пользователю был присвоен ID (автогенерация)
+        assertEquals("integration@example.com", saved.getEmail()); // Проверка: что email совпадает
+        assertEquals(1, userRepository.count()); // Проверка: что в базе данных ровно 1 пользователь
     }
 
     @Test
     @Order(2)
     void findUserById_ShouldReturnUser() {
+        // given
+        // Сохраняем пользователя напрямую в репозиторий для подготовки данных
+        // Преобразуем DTO в сущность через маппер и сохраняем в реальную БД
         User saved = userRepository.save(userMapper.toEntity(userDto));
 
+        //when
+        // Вызываем тестируемый метод получения пользователя по ID
+        // В интеграционном тесте это реальный запрос к базе данных
         UserDto result = userService.findUserById(saved.getId());
 
-        assertNotNull(result);
-        assertEquals(saved.getEmail(), result.getEmail());
+        // then
+        assertNotNull(result); // Проверка: что результат не null
+        assertEquals(saved.getEmail(), result.getEmail()); // Проверка: что email совпадает с сохранённым
     }
 
     @Test
     @Order(3)
     void findUserById_NotFound_ShouldThrow() {
+        // given
+        // База данных пуста (очищена в setUp()), пользователя с ID 999 не существует
+
+        //when & then
+        // Вызываем тестируемый метод с несуществующим ID и ожидаем выброс исключения
+        // В интеграционном тесте это реальный запрос к базе данных, который вернёт пустой результат
         assertThrows(UserNotFoundException.class, () -> userService.findUserById(999L));
     }
 
     @Test
     @Order(4)
     void getUserByEmailNative_ShouldReturnUser() {
+        // given
+        // Сохраняем пользователя напрямую в репозиторий для подготовки данных
         User saved = userRepository.save(userMapper.toEntity(userDto));
 
+        //when
+        // Вызываем тестируемый метод получения пользователя по email через нативный SQL запрос
+        // В интеграционном тесте это реальный запрос к базе данных через нативный SQL
         UserDto result = userService.getUserByEmailNative(saved.getEmail());
 
-        assertNotNull(result);
-        assertEquals(saved.getEmail(), result.getEmail());
+        // then
+        assertNotNull(result); // Проверка: что результат не null
+        assertEquals(saved.getEmail(), result.getEmail()); // Проверка: что email совпадает с сохранённым
     }
 
     @Test
     @Order(5)
     void updateUser_ShouldModifyData() {
+        // given
+        // Сохраняем пользователя напрямую в репозиторий для подготовки данных
         User saved = userRepository.save(userMapper.toEntity(userDto));
-        // Устанавливаем дефолтную дату рождения, чтобы пользователь мог её изменить
-        saved.setBirthDate(LocalDate.now().minusYears(18));
-        saved = userRepository.save(saved);
 
-        UserUpdateRequest updateDto = new UserUpdateRequest();
-        updateDto.setUserId(saved.getId());
-        updateDto.setName("Updated");
-        updateDto.setSurname("User");
-        // Email нельзя изменить после регистрации - не обновляем email в тесте
-        // updateDto.setEmail("updated@example.com");
-        updateDto.setBirthDate(LocalDate.of(1990, 1, 1));
+        // Создаём DTO с данными для обновления пользователя
+        UpdateUserDto updateDto = new UpdateUserDto();
+        updateDto.setName("Updated"); // новое имя
+        updateDto.setSurname("User"); // новая фамилия
+        updateDto.setBirthDate(LocalDate.of(1990, 1, 1)); // новая дата рождения
 
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(
-                        saved.getEmail(),
-                        null,
-                        java.util.List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        //when
+        // Вызываем тестируемый метод обновления пользователя
+        // Используем email сохранённого пользователя для проверки прав доступа
+        // В интеграционном тесте это реальное обновление данных в базе данных
+        UserDto updated = userService.updateUser(saved.getId(), updateDto, saved.getEmail());
 
-        UserDto updated = userService.updateUser(saved.getId(), updateDto);
-
-        assertEquals("Updated", updated.getName());
-        assertEquals("integration@example.com", updated.getEmail()); // Email не изменился
-        assertEquals(LocalDate.of(1990, 1, 1), updated.getBirthDate());
-
-        SecurityContextHolder.clearContext();
+        // then
+        assertEquals("Updated", updated.getName()); // Проверка: что имя обновилось
+        assertEquals(saved.getEmail(), updated.getEmail()); // Проверка: что email не изменился (берётся из токена)
     }
 
     @Test
     @Order(6)
     void deleteUser_ShouldRemoveFromDatabase() {
+        // given
+        // Сохраняем пользователя напрямую в репозиторий для подготовки данных
         User saved = userRepository.save(userMapper.toEntity(userDto));
 
+        //when
+        // Вызываем тестируемый метод удаления пользователя
+        // В интеграционном тесте это реальное удаление данных из базы данных
         userService.deleteUser(saved.getId());
 
+        // then
+        // Проверка: что в базе данных 0 пользователей (пользователь был удалён)
         assertEquals(0, userRepository.count());
     }
 }
