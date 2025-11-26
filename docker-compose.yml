@@ -1,0 +1,68 @@
+services:
+  us_db:
+    image: postgres:16
+    container_name: us_db
+    restart: always
+    environment:
+      POSTGRES_DB: us_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d us_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-network
+
+  user-service:
+    build: .
+    container_name: user-service
+    depends_on:
+      us_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://us_db:5432/us_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8082:8080"
+    networks:
+      - backend-network
+    restart: always
+
+volumes:
+  pgdata:
+  redis_data:
+
+networks:
+  backend-network:
+    name: backend-network
+    external: true
