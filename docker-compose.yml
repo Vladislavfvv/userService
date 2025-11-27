@@ -39,6 +39,7 @@ services:
 
   user-service:
     build: .
+    image: user-service:latest
     container_name: user-service
     depends_on:
       us_db:
