@@ -22,11 +22,11 @@ public class UserDto {
 
     private Long id;
 
-    @NotBlank(message = "Name must not be blank")
-    private String name;
+    @NotBlank(message = "First name must not be blank")
+    private String firstName;
 
-    @NotBlank(message = "Surname must not be blank")
-    private String surname;
+    @NotBlank(message = "Last name must not be blank")
+    private String lastName;
 
     @NotNull(message = "Birth date is required")
     @PastOrPresent(message = "Birth date cannot be in the future")

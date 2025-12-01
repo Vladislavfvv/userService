@@ -55,8 +55,8 @@ class UserServiceIT extends BaseIntegrationTest{
         // Создаём тестовый DTO для использования в интеграционных тестах
         // В интеграционных тестах мы работаем с реальной базой данных через Testcontainers
         userDto = new UserDto();
-        userDto.setName("Integration");
-        userDto.setSurname("Test");
+        userDto.setFirstName("Integration");
+        userDto.setLastName("Test");
         userDto.setEmail("integration@example.com");
         userDto.setBirthDate(LocalDate.of(1995, 5, 5));
     }
@@ -134,8 +134,8 @@ class UserServiceIT extends BaseIntegrationTest{
 
         // Создаём DTO с данными для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setName("Updated"); // новое имя
-        updateDto.setSurname("User"); // новая фамилия
+        updateDto.setFirstName("Updated"); // новое имя
+        updateDto.setLastName("User"); // новая фамилия
         updateDto.setBirthDate(LocalDate.of(1990, 1, 1)); // новая дата рождения
 
         //when
@@ -145,7 +145,7 @@ class UserServiceIT extends BaseIntegrationTest{
         UserDto updated = userService.updateUser(saved.getId(), updateDto, saved.getEmail());
 
         // then
-        assertEquals("Updated", updated.getName()); // Проверка: что имя обновилось
+        assertEquals("Updated", updated.getFirstName()); // Проверка: что имя обновилось
         assertEquals(saved.getEmail(), updated.getEmail()); // Проверка: что email не изменился (берётся из токена)
     }
 

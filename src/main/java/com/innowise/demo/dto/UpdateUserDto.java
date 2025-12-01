@@ -18,9 +18,9 @@ import lombok.Setter;
 @Getter
 public class UpdateUserDto {
 
-    private String name;
+    private String firstName;
 
-    private String surname;
+    private String lastName;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate birthDate;

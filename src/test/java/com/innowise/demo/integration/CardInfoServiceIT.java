@@ -106,8 +106,8 @@ class CardInfoServiceIT extends BaseIntegrationTest{
         // Создаём тестового пользователя для использования в тестах карт
         // Карты должны принадлежать пользователю, поэтому сначала создаём пользователя
         UserDto userDto = new UserDto();
-        userDto.setName("Integration");
-        userDto.setSurname("CardTest");
+        userDto.setFirstName("Integration");
+        userDto.setLastName("CardTest");
         userDto.setEmail(testUserEmail);
         userDto.setBirthDate(LocalDate.of(1995, 5, 5));
 

@@ -65,8 +65,8 @@ class UserControllerTest {
     void setUp() {
         userDto = new UserDto();
         userDto.setId(1L);
-        userDto.setName("Test");
-        userDto.setSurname("User");
+        userDto.setFirstName("Test");
+        userDto.setLastName("User");
         userDto.setEmail("test@example.com");
         userDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
@@ -111,8 +111,8 @@ class UserControllerTest {
         // given
         // Создаём DTO для запроса — данные, которые клиент отправляет на сервер
         UserDto requestDto = new UserDto();
-        requestDto.setName("Test");
-        requestDto.setSurname("User");
+        requestDto.setFirstName("Test");
+        requestDto.setLastName("User");
         requestDto.setEmail("test@example.com");
         requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
@@ -128,7 +128,7 @@ class UserControllerTest {
                         .content(objectMapper.writeValueAsString(requestDto)))
                 .andExpect(status().isOk()) // Проверка: что контроллер вернул 200 OK
                 .andExpect(jsonPath("$.id").value(1L)) // Проверка: JSON содержит правильный ID
-                .andExpect(jsonPath("$.name").value("Test")) // Проверка: имя совпадает
+                .andExpect(jsonPath("$.firstName").value("Test")) // Проверка: имя совпадает
                 .andExpect(jsonPath("$.email").value("test@example.com")); // Проверка: email совпадает
     }
 
@@ -139,8 +139,8 @@ class UserControllerTest {
         // Создаём DTO с невалидными данными — пустое имя
         // Это проверяет, что Spring Validation (@NotBlank) работает корректно
         UserDto invalidDto = new UserDto();
-        invalidDto.setName(""); // пустое имя — это нарушает валидацию @NotBlank
-        invalidDto.setSurname("User");
+        invalidDto.setFirstName(""); // пустое имя — это нарушает валидацию @NotBlank
+        invalidDto.setLastName("User");
         invalidDto.setEmail("test@example.com");
         invalidDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
@@ -162,8 +162,8 @@ class UserControllerTest {
         // given
         // Создаём DTO для запроса — данные, которые клиент отправляет на сервер
         UserDto requestDto = new UserDto();
-        requestDto.setName("Test");
-        requestDto.setSurname("User");
+        requestDto.setFirstName("Test");
+        requestDto.setLastName("User");
         requestDto.setEmail("test@example.com");
         requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
@@ -206,7 +206,7 @@ class UserControllerTest {
                             .principal(authentication))
                     .andExpect(status().isOk()) // Проверка: что контроллер вернул 200 OK
                     .andExpect(jsonPath("$.id").value(1L)) // Проверка: JSON содержит правильный ID
-                    .andExpect(jsonPath("$.name").value("Test")) // Проверка: имя совпадает
+                    .andExpect(jsonPath("$.firstName").value("Test")) // Проверка: имя совпадает
                     .andExpect(jsonPath("$.email").value("test@example.com")); // Проверка: email совпадает
         }
     }
@@ -322,7 +322,7 @@ class UserControllerTest {
                     .andExpect(status().isOk()) // Проверка: что контроллер вернул 200 OK
                     .andExpect(jsonPath("$.id").value(1L)) // Проверка: JSON содержит правильный ID
                     .andExpect(jsonPath("$.email").value("test@example.com")) // Проверка: email совпадает
-                    .andExpect(jsonPath("$.name").value("Test")); // Проверка: имя совпадает
+                    .andExpect(jsonPath("$.firstName").value("Test")); // Проверка: имя совпадает
         }
     }
 
@@ -393,8 +393,8 @@ class UserControllerTest {
         // given
         // Создаём DTO для запроса — данные, которые клиент отправляет на сервер
         CreateUserFromTokenRequest requestDto = new CreateUserFromTokenRequest();
-        requestDto.setName("Test");
-        requestDto.setSurname("User");
+        requestDto.setFirstName("Test");
+        requestDto.setLastName("User");
         requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
         String email = "test@example.com";
@@ -421,7 +421,7 @@ class UserControllerTest {
                             .principal(authentication))
                     .andExpect(status().isOk()) // Проверка: что контроллер вернул 200 OK
                     .andExpect(jsonPath("$.id").value(1L)) // Проверка: JSON содержит правильный ID
-                    .andExpect(jsonPath("$.name").value("Test")) // Проверка: имя совпадает
+                    .andExpect(jsonPath("$.firstName").value("Test")) // Проверка: имя совпадает
                     .andExpect(jsonPath("$.email").value("test@example.com")); // Проверка: email совпадает
         }
     }
@@ -433,8 +433,8 @@ class UserControllerTest {
         // Создаём DTO с невалидными данными — пустое имя
         // Это проверяет, что Spring Validation (@NotBlank) работает корректно
         CreateUserFromTokenRequest invalidDto = new CreateUserFromTokenRequest();
-        invalidDto.setName(""); // пустое имя — это нарушает валидацию @NotBlank
-        invalidDto.setSurname("User");
+        invalidDto.setFirstName(""); // пустое имя — это нарушает валидацию @NotBlank
+        invalidDto.setLastName("User");
         invalidDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
         //when
@@ -455,8 +455,8 @@ class UserControllerTest {
         // given
         // Создаём DTO для запроса — данные, которые клиент отправляет на сервер
         CreateUserFromTokenRequest requestDto = new CreateUserFromTokenRequest();
-        requestDto.setName("Test");
-        requestDto.setSurname("User");
+        requestDto.setFirstName("Test");
+        requestDto.setLastName("User");
         requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
         String email = "test@example.com";
@@ -491,8 +491,8 @@ class UserControllerTest {
         // given
         // Создаём DTO для запроса
         CreateUserFromTokenRequest requestDto = new CreateUserFromTokenRequest();
-        requestDto.setName("Test");
-        requestDto.setSurname("User");
+        requestDto.setFirstName("Test");
+        requestDto.setLastName("User");
         requestDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
         //when
@@ -588,15 +588,15 @@ class UserControllerTest {
         // given
         // Создаём DTO для запроса — данные, которые клиент отправляет для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setName("Updated");
-        updateDto.setSurname("User");
+        updateDto.setFirstName("Updated");
+        updateDto.setLastName("User");
         updateDto.setBirthDate(LocalDate.of(1995, 5, 5));
 
         // Создаём DTO, которое будет возвращать сервис после обновления пользователя
         UserDto updatedDto = new UserDto();
         updatedDto.setId(1L); // ID пользователя остаётся прежним
-        updatedDto.setName("Updated");
-        updatedDto.setSurname("User");
+        updatedDto.setFirstName("Updated");
+        updatedDto.setLastName("User");
         updatedDto.setEmail("updated@example.com");
         updatedDto.setBirthDate(LocalDate.of(1995, 5, 5));
 
@@ -622,7 +622,7 @@ class UserControllerTest {
                             .principal(authentication))//задаёт информацию о правах текущего аутентифицированного пользователя для запроса
                     .andExpect(status().isOk()) // Проверка: что контроллер вернул 200 OK
                     .andExpect(jsonPath("$.id").value(1L)) // Проверка: ID пользователя остался прежним
-                    .andExpect(jsonPath("$.name").value("Updated")) // Проверка: имя обновилось
+                    .andExpect(jsonPath("$.firstName").value("Updated")) // Проверка: имя обновилось
                     .andExpect(jsonPath("$.email").value("updated@example.com")); // Проверка: email совпадает
         }
     }
@@ -633,8 +633,8 @@ class UserControllerTest {
         // given
         // Создаём DTO для запроса — данные, которые клиент отправляет для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setName("Updated");
-        updateDto.setSurname("User");
+        updateDto.setFirstName("Updated");
+        updateDto.setLastName("User");
         updateDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
         //when
@@ -668,7 +668,7 @@ class UserControllerTest {
         // given
         // Создаём DTO для запроса — данные, которые клиент отправляет для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setName("Updated");
+        updateDto.setFirstName("Updated");
 
         //when
         // Когда кто-то вызовет userService.updateUser(1L, любой UpdateUserDto, любой String), выбрось исключение
@@ -703,8 +703,8 @@ class UserControllerTest {
     // Email берется из токена и не может быть изменен через этот endpoint
 
     @Test
-    @DisplayName("DELETE /api/v1/users/1 - успешное удаление пользователя")
-    void deleteUser_ShouldReturnNoContent() throws Exception {
+    @DisplayName("DELETE /api/v1/users/1 - успешное удаление пользователя ADMIN")
+    void deleteUser_ShouldReturnNoContent_WhenAdmin() throws Exception {
         // given
         // Когда кто-то вызовет userService.findUserById(1L), верни userDto
         // (это нужно для проверки прав доступа — контроллер сначала получает пользователя)
@@ -713,11 +713,10 @@ class UserControllerTest {
         //when
         // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
-            // Создаём мок аутентификации — как будто пользователь уже залогинен
-            JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
-            // Когда метод SecurityUtils.hasAccess(...) вызвается с любым первым аргументом
-            // и "test@example.com" во втором — возвращай true (разрешаем доступ)
-            mockedSecurityUtils.when(() -> SecurityUtils.hasAccess(any(), eq("test@example.com")))
+            // Создаём мок аутентификации — как будто администратор уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication("admin@example.com", "ADMIN");
+            // Когда метод SecurityUtils.isAdmin(...) вызвается — возвращай true (пользователь является администратором)
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication))
                     .thenReturn(true);
 
             // then
@@ -726,6 +725,32 @@ class UserControllerTest {
                             .principal(authentication))
                     .andExpect(status().isNoContent()); // Проверка: что контроллер вернул 204 No Content
             // (стандартный HTTP статус для успешного удаления без тела ответа)
+        }
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/users/1 - доступ запрещен для USER")
+    void deleteUser_ShouldReturnForbidden_WhenUser() throws Exception {
+        // given
+        // Когда кто-то вызовет userService.findUserById(1L), верни userDto
+        when(userService.findUserById(1L)).thenReturn(userDto);
+
+        //when
+        // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            // Создаём мок аутентификации — как будто обычный пользователь уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+            // Когда метод SecurityUtils.isAdmin(...) вызвается — возвращай false (пользователь НЕ является администратором)
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication))
+                    .thenReturn(false);
+
+            // then
+            // Выполняем DELETE запрос на /api/v1/users/1 от обычного пользователя
+            mockMvc.perform(delete("/api/v1/users/1")
+                            .principal(authentication))
+                    .andExpect(status().isForbidden()) // Проверка: что контроллер вернул 403 Forbidden
+                    .andExpect(jsonPath("$.code").value("ACCESS_DENIED")) // Проверка: код ошибки ACCESS_DENIED
+                    .andExpect(jsonPath("$.message").value("Access denied: Only administrators can delete users")); // Проверка: сообщение об ошибке
         }
     }
 
@@ -741,8 +766,11 @@ class UserControllerTest {
 
         // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
-            // Создаём мок аутентификации — как будто пользователь уже залогинен
-            JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+            // Создаём мок аутентификации — как будто администратор уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication("admin@example.com", "ADMIN");
+            // Когда метод SecurityUtils.isAdmin(...) вызвается — возвращай true (пользователь является администратором)
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication))
+                    .thenReturn(true);
 
             // then
             // Выполняем DELETE запрос на несуществующего пользователя

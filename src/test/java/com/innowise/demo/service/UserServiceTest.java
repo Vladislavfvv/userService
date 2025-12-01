@@ -23,6 +23,7 @@ import com.innowise.demo.mapper.UserMapper;
 import com.innowise.demo.model.User;
 import com.innowise.demo.repository.CardInfoRepository;
 import com.innowise.demo.repository.UserRepository;
+import com.innowise.demo.client.AuthServiceClient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -49,6 +50,9 @@ class UserServiceTest {
     @Mock
     private CacheManager cacheManager;
 
+    @Mock
+    private AuthServiceClient authServiceClient;
+
     private User user;
     private UserDto userDto;
 
@@ -58,15 +62,15 @@ class UserServiceTest {
 
         user = new User();
         user.setId(1L);
-        user.setName("Masha");
-        user.setSurname("Raspberry");
+        user.setFirstName("Masha");
+        user.setLastName("Raspberry");
         user.setEmail("masha@gmail.com");
         user.setBirthDate(LocalDate.of(1990, 1, 1));
 
         userDto = new UserDto();
         userDto.setId(1L);
-        userDto.setName("Masha");
-        userDto.setSurname("Raspberry");
+        userDto.setFirstName("Masha");
+        userDto.setLastName("Raspberry");
         userDto.setEmail("masha@gmail.com");
         userDto.setBirthDate(LocalDate.of(1990, 1, 1));
     }
@@ -216,8 +220,8 @@ class UserServiceTest {
         when(userMapper.toEntity(any(UserDto.class))).thenAnswer(invocation -> {
             UserDto dto = invocation.getArgument(0);
             User u = new User();
-            u.setName(dto.getName());
-            u.setSurname(dto.getSurname());
+            u.setFirstName(dto.getFirstName());
+            u.setLastName(dto.getLastName());
             u.setEmail(dto.getEmail());
             u.setBirthDate(dto.getBirthDate());
             return u;
@@ -226,8 +230,8 @@ class UserServiceTest {
         when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
             User u = invocation.getArgument(0);
             UserDto dto = new UserDto();
-            dto.setName(u.getName());
-            dto.setSurname(u.getSurname());
+            dto.setFirstName(u.getFirstName());
+            dto.setLastName(u.getLastName());
             dto.setEmail(u.getEmail());
             dto.setBirthDate(u.getBirthDate());
             return dto;
@@ -239,8 +243,8 @@ class UserServiceTest {
 
         // then
         assertNotNull(result); // Проверка: что результат не null
-        assertEquals("Masha", result.getName()); // Проверка: что имя совпадает
-        assertEquals("Raspberry", result.getSurname()); // Проверка: что фамилия совпадает
+        assertEquals("Masha", result.getFirstName()); // Проверка: что имя совпадает
+        assertEquals("Raspberry", result.getLastName()); // Проверка: что фамилия совпадает
         assertEquals("masha@gmail.com", result.getEmail()); // Проверка: что email совпадает
         assertEquals(LocalDate.of(1990,1,1), result.getBirthDate()); // Проверка: что дата рождения совпадает
         verify(userRepository, times(1)).save(any(User.class)); // Проверка: что метод save был вызван ровно 1 раз
@@ -293,8 +297,8 @@ class UserServiceTest {
             User u = invocation.getArgument(0);
             UserDto dto = new UserDto();
             dto.setId(u.getId());
-            dto.setName(u.getName());
-            dto.setSurname(u.getSurname());
+            dto.setFirstName(u.getFirstName());
+            dto.setLastName(u.getLastName());
             dto.setEmail(u.getEmail());
             dto.setBirthDate(u.getBirthDate());
             return dto;
@@ -302,8 +306,8 @@ class UserServiceTest {
 
         // Создаём DTO с данными для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setName("Ivan"); // новое имя
-        updateDto.setSurname("Vanusha"); // новая фамилия
+        updateDto.setFirstName("Ivan"); // новое имя
+        updateDto.setLastName("Vanusha"); // новая фамилия
         updateDto.setBirthDate(LocalDate.of(2000,1,1)); // новая дата рождения
 
         //when
@@ -313,8 +317,8 @@ class UserServiceTest {
 
         // then
         assertNotNull(result); // Проверка: что результат не null
-        assertEquals("Ivan", result.getName()); // Проверка: что имя обновилось
-        assertEquals("Vanusha", result.getSurname()); // Проверка: что фамилия обновилась
+        assertEquals("Ivan", result.getFirstName()); // Проверка: что имя обновилось
+        assertEquals("Vanusha", result.getLastName()); // Проверка: что фамилия обновилась
         assertEquals("masha@gmail.com", result.getEmail()); // Проверка: что email не изменился (берётся из токена)
         assertEquals(LocalDate.of(2000,1,1), result.getBirthDate()); // Проверка: что дата рождения обновилась
 
@@ -331,7 +335,7 @@ class UserServiceTest {
 
         // Создаём DTO с данными для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setName("Ivan");
+        updateDto.setFirstName("Ivan");
 
         //when & then
         // Вызываем тестируемый метод с другим email ("other@example.com" вместо "masha@gmail.com")
@@ -362,6 +366,8 @@ class UserServiceTest {
         // then
         // Проверка: что метод deleteById был вызван ровно 1 раз с аргументом 1L
         verify(userRepository, times(1)).deleteById(1L);
+        // Проверка: что метод deleteUser был вызван в authServiceClient для синхронизации удаления
+        verify(authServiceClient, times(1)).deleteUser(user.getEmail());
     }
 
     @DisplayName("deleteUser_Negative")
@@ -476,8 +482,8 @@ class UserServiceTest {
             User u = invocation.getArgument(0);
             UserDto dto = new UserDto();
             dto.setId(u.getId());
-            dto.setName(u.getName());
-            dto.setSurname(u.getSurname());
+            dto.setFirstName(u.getFirstName());
+            dto.setLastName(u.getLastName());
             dto.setEmail(u.getEmail());
             dto.setBirthDate(u.getBirthDate());
             return dto;
@@ -485,8 +491,8 @@ class UserServiceTest {
 
         // Создаём DTO с данными для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setName("Ivan");
-        updateDto.setSurname("Vanusha");
+        updateDto.setFirstName("Ivan");
+        updateDto.setLastName("Vanusha");
         updateDto.setBirthDate(LocalDate.of(2000, 1, 1));
         updateDto.setCards(null); // null карты — карты не передаются для обновления
 

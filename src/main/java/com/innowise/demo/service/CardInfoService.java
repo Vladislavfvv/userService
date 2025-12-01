@@ -25,9 +25,12 @@ import com.innowise.demo.model.CardInfo;
 import com.innowise.demo.model.User;
 import com.innowise.demo.repository.CardInfoRepository;
 import com.innowise.demo.repository.UserRepository;
+import com.innowise.demo.util.SecurityUtils;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CardInfoService {
@@ -70,21 +73,33 @@ public class CardInfoService {
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','USER')")
-    @Cacheable(value = ALL_CARDS_CACHE,
-            key = "{ T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName(), #page, #size }")
+    // Кеширование отключено для этого метода, так как Page<CardInfoDto> не может быть корректно десериализован из Redis
+    // из-за проблем с полиморфной валидацией Jackson для PageImpl
+    // @Cacheable(value = ALL_CARDS_CACHE,
+    //         key = "{ T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication()?.name ?: 'anonymous', #page, #size }",
+    //         unless = "#result == null")
     public Page<CardInfoDto> getAllCardInfos(int page, int size) {
         Authentication authentication = requireAuthentication();
         boolean isAdmin = isAdmin(authentication);
 
-        Page<CardInfoDto> dto = isAdmin
-                ? cardInfoRepository.findAll(PageRequest.of(page, size)).map(cardInfoMapper::toDto)
-                : cardInfoRepository.findAllByUser_EmailIgnoreCase(resolveCurrentUserIdentifier(authentication),
+        try {
+            if (isAdmin) {
+                log.debug("Admin user requested all cards");
+                Page<CardInfoDto> dto = cardInfoRepository.findAll(PageRequest.of(page, size)).map(cardInfoMapper::toDto);
+                return dto;
+            } else {
+                String userEmail = resolveCurrentUserIdentifier(authentication);
+                log.debug("User {} requested their cards", userEmail);
+                Page<CardInfoDto> dto = cardInfoRepository.findAllByUser_EmailIgnoreCase(userEmail,
                         PageRequest.of(page, size))
                         .map(cardInfoMapper::toDto);
-
-        if(dto.isEmpty()) throw new CardInfoNotFoundException("CardInfo list is empty");
-
+                log.debug("Found {} cards for user {}", dto.getTotalElements(), userEmail);
         return dto;
+            }
+        } catch (Exception e) {
+            log.error("Error getting card infos for page {} size {}", page, size, e);
+            throw e;
+        }
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','USER')")
@@ -172,8 +187,14 @@ public class CardInfoService {
     }
 
     private String resolveCurrentUserIdentifier(Authentication authentication) {
+        // Используем SecurityUtils для единообразия с другими частями приложения
+        try {
+            return SecurityUtils.getEmailFromToken(authentication);
+        } catch (IllegalStateException e) {
+            // Если не удалось извлечь email через SecurityUtils, пробуем альтернативные способы
         if (authentication instanceof JwtAuthenticationToken jwtAuthenticationToken) {
             Jwt jwt = jwtAuthenticationToken.getToken();
+                // Fallback на другие claims
             String email = jwt.getClaimAsString("email");
             if (email != null && !email.isBlank()) {
                 return email;
@@ -181,10 +202,6 @@ public class CardInfoService {
             String preferredUsername = jwt.getClaimAsString("preferred_username");
             if (preferredUsername != null && !preferredUsername.isBlank()) {
                 return preferredUsername;
-            }
-            String subject = jwt.getSubject();
-            if (subject != null && !subject.isBlank()) {
-                return subject;
             }
         }
 
@@ -198,6 +215,7 @@ public class CardInfoService {
             return name;
         }
 
-        throw new AccessDeniedException("Cannot determine current user");
+            throw new AccessDeniedException("Cannot determine current user: " + e.getMessage());
+        }
     }
 }

@@ -56,7 +56,7 @@ public class UserController {
      * Email извлекается из токена (claim "sub"), остальные данные из тела запроса.
      * Пользователь должен быть зарегистрирован в auth-service и иметь валидный JWT токен.
      * 
-     * @param request данные пользователя (name, surname, birthDate)
+     * @param request данные пользователя (firstName, lastName, birthDate)
      * @param authentication объект аутентификации, содержащий JWT токен
      * @return созданный пользователь
      */
@@ -157,22 +157,32 @@ public class UserController {
 
     /**
      * Удаление пользователя.
-     * ADMIN: может удалить любого пользователя.
-     * USER: может удалить только свою информацию.
+     * Только ADMIN может удалять пользователей.
+     * USER не может удалять даже свои данные.
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(
             @PathVariable Long id,
             Authentication authentication) {
-        // Получаем текущего пользователя для проверки доступа
-        UserDto currentUser = userService.findUserById(id);
+        log.info("Delete user request received for user ID: {} by user: {}", id, 
+                authentication != null ? SecurityUtils.getEmailFromToken(authentication) : "unknown");
         
-        // Проверка доступа: USER может удалить только свою информацию
-        if (!SecurityUtils.hasAccess(authentication, currentUser.getEmail())) {
-            throw new AccessDeniedException("Access denied: You can only delete your own information");
+        // Проверка доступа: только ADMIN может удалять пользователей
+        if (!SecurityUtils.isAdmin(authentication)) {
+            log.warn("Access denied: User {} attempted to delete user ID: {}", 
+                    SecurityUtils.getEmailFromToken(authentication), id);
+            throw new AccessDeniedException("Access denied: Only administrators can delete users");
         }
         
+        log.info("Admin user {} is deleting user ID: {}", SecurityUtils.getEmailFromToken(authentication), id);
+        
+        // Проверяем, что пользователь существует и получаем email для синхронизации
+        UserDto userToDelete = userService.findUserById(id);
+        log.info("User to delete found: {} (email: {})", id, userToDelete.getEmail());
+        
         userService.deleteUser(id);
+        log.info("User ID: {} successfully deleted from user-service", id);
+        
         return ResponseEntity.noContent().build();
     }
 }
