@@ -155,10 +155,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push Docker Image to GHCR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
-          IMAGE_NAME=ghcr.io/${{ github.repository }}/user_service
-          IMAGE_NAME=$(echo $IMAGE_NAME | tr '[:upper:]' '[:lower:]')  
-          TAG=${{ github.sha }}
-          docker build -t $IMAGE_NAME:$TAG .
-          docker push $IMAGE_NAME:$TAG
-          echo "Image pushed: $IMAGE_NAME:$TAG"
+          IMAGE_NAME=$(echo "${{ github.actor }}" | tr '[:upper:]' '[:lower:]')
+          docker build -t user-service:latest .
+          docker tag user-service:latest ghcr.io/${IMAGE_NAME}/user-service:latest
+          docker tag user-service:latest ghcr.io/${IMAGE_NAME}/user-service:${{ github.sha }}
+          docker push ghcr.io/${IMAGE_NAME}/user-service:latest
+          docker push ghcr.io/${IMAGE_NAME}/user-service:${{ github.sha }}
+          echo "Image pushed: ghcr.io/${IMAGE_NAME}/user-service:latest"
+          echo "Image pushed: ghcr.io/${IMAGE_NAME}/user-service:${{ github.sha }}"
