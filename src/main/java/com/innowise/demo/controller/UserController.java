@@ -131,28 +131,54 @@ public class UserController {
     }
 
     /**
-     * Обновление пользователя.
-     * ADMIN: может обновить любого пользователя.
-     * USER: может обновить только свою информацию.
+     * Обновление текущего пользователя (свой профиль).
+     * ID берется из JWT токена (по email).
      * Выполняет частичное обновление - обновляются только переданные поля.
      * Email берется из токена, holder для карт автоматически формируется из name + surname.
-     * Проверка доступа выполняется в сервисе.
+     */
+    @PutMapping("/me")
+    public ResponseEntity<UserDto> updateCurrentUser(
+            @RequestBody UpdateUserDto dto,
+            Authentication authentication) {
+        // Извлекаем email из токена
+        String userEmail;
+        try {
+            userEmail = SecurityUtils.getEmailFromToken(authentication);
+        } catch (IllegalStateException e) {
+            throw new AccessDeniedException("Access denied: Authentication required.");
+        }
+        
+        // Находим пользователя по email и обновляем его
+        return ResponseEntity.ok(userService.updateCurrentUser(userEmail, dto));
+    }
+
+    /**
+     * Обновление пользователя по ID (только для ADMIN).
+     * ADMIN может обновить любого пользователя.
+     * Выполняет частичное обновление - обновляются только переданные поля.
+     * Holder для карт автоматически формируется из name + surname.
      */
     @PutMapping("/{id}")
     public ResponseEntity<UserDto> updateUser(
             @PathVariable Long id,
             @RequestBody UpdateUserDto dto,
             Authentication authentication) {
-        // Извлекаем email из токена для передачи в сервис
-        String userEmail;
-        try {
-            userEmail = SecurityUtils.getEmailFromToken(authentication);
-        } catch (IllegalStateException e) {
-            throw new AccessDeniedException("Access denied: You can only update your own information.");
+        // Проверка доступа: только ADMIN может обновлять пользователей по ID
+        if (!SecurityUtils.isAdmin(authentication)) {
+            throw new AccessDeniedException("Access denied: Only administrators can update users by ID. " +
+                    "Use PUT /api/v1/users/me to update your own profile.");
         }
         
-        // Сервис сам проверит права доступа и выбросит исключение при необходимости
-        return ResponseEntity.ok(userService.updateUser(id, dto, userEmail));
+        // Извлекаем email админа для логирования
+        String adminEmail;
+        try {
+            adminEmail = SecurityUtils.getEmailFromToken(authentication);
+        } catch (IllegalStateException e) {
+            throw new AccessDeniedException("Access denied: Authentication required.");
+        }
+        
+        // Админ может обновить любого пользователя (проверка доступа не требуется)
+        return ResponseEntity.ok(userService.updateUserByAdmin(id, dto, adminEmail));
     }
 
     /**

@@ -277,22 +277,14 @@ class UserServiceTest {
         verify(userRepository, times(1)).findAll(PageRequest.of(0,5)); // Проверка: что метод был вызван ровно 1 раз
     }
 
-    // ----------------- updateUser -----------------
+    // ----------------- updateCurrentUser -----------------
 
-    @DisplayName("updateUser_Positive")
+    @DisplayName("updateCurrentUser_Positive")
     @Test
-    void updateUser_ShouldReturnUpdatedDto_WhenUserExists() {
+    void updateCurrentUser_ShouldReturnUpdatedDto_WhenUserExists() {
         // given
-        // Когда кто-то вызовет userRepository.findById(1L), верни Optional с user
-        // (это объект, созданный в setUp() с данными пользователя)
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        // Мок save через thenAnswer возвращает объект, который реально был передан
-        // Это имитирует сохранение: метод save возвращает тот же объект, который был передан
+        when(userRepository.findByEmailNativeQuery("masha@gmail.com")).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Маппер toDto формирует DTO из текущего состояния объекта User
-        // Это позволяет проверить, что данные действительно обновились
         when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
             User u = invocation.getArgument(0);
             UserDto dto = new UserDto();
@@ -304,49 +296,85 @@ class UserServiceTest {
             return dto;
         });
 
-        // Создаём DTO с данными для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setFirstName("Ivan"); // новое имя
-        updateDto.setLastName("Vanusha"); // новая фамилия
-        updateDto.setBirthDate(LocalDate.of(2000,1,1)); // новая дата рождения
+        updateDto.setFirstName("Ivan");
+        updateDto.setLastName("Vanusha");
+        updateDto.setBirthDate(LocalDate.of(2000,1,1));
 
         //when
-        // Вызываем тестируемый метод обновления пользователя
-        // Используем email пользователя из мока (masha@gmail.com) для проверки прав доступа
-        UserDto result = userService.updateUser(1L, updateDto, "masha@gmail.com");
+        UserDto result = userService.updateCurrentUser("masha@gmail.com", updateDto);
 
         // then
-        assertNotNull(result); // Проверка: что результат не null
-        assertEquals("Ivan", result.getFirstName()); // Проверка: что имя обновилось
-        assertEquals("Vanusha", result.getLastName()); // Проверка: что фамилия обновилась
-        assertEquals("masha@gmail.com", result.getEmail()); // Проверка: что email не изменился (берётся из токена)
-        assertEquals(LocalDate.of(2000,1,1), result.getBirthDate()); // Проверка: что дата рождения обновилась
-
-        verify(userRepository, times(1)).save(any(User.class)); // Проверка: что метод save был вызван ровно 1 раз
+        assertNotNull(result);
+        assertEquals("Ivan", result.getFirstName());
+        assertEquals("Vanusha", result.getLastName());
+        assertEquals("masha@gmail.com", result.getEmail());
+        assertEquals(LocalDate.of(2000,1,1), result.getBirthDate());
+        verify(userRepository, times(1)).save(any(User.class));
     }
 
-    @DisplayName("updateUser_Negative_AccessDenied")
+    @DisplayName("updateCurrentUser_Negative_UserNotFound")
     @Test
-    void updateUser_ShouldThrowAccessDenied_WhenEmailMismatch() {
+    void updateCurrentUser_ShouldThrowUserNotFound_WhenUserNotExists() {
         // given
-        // Когда кто-то вызовет userRepository.findById(1L), верни Optional с user
-        // (это пользователь с email "masha@gmail.com" из setUp())
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailNativeQuery("notfound@gmail.com")).thenReturn(Optional.empty());
 
-        // Создаём DTO с данными для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
         updateDto.setFirstName("Ivan");
 
         //when & then
-        // Вызываем тестируемый метод с другим email ("other@example.com" вместо "masha@gmail.com")
-        // Это имитирует ситуацию, когда пользователь пытается обновить данные другого пользователя
-        org.springframework.security.access.AccessDeniedException exception = 
-            assertThrows(org.springframework.security.access.AccessDeniedException.class, 
-                () -> userService.updateUser(1L, updateDto, "other@example.com"));
+        assertThrows(UserNotFoundException.class, 
+                () -> userService.updateCurrentUser("notfound@gmail.com", updateDto));
+    }
 
-        // Проверка: что сообщение исключения содержит информацию об отказе в доступе
-        assertTrue(exception.getMessage().contains("Access denied"));
-        assertTrue(exception.getMessage().contains("Please, change Id in url"));
+    // ----------------- updateUserByAdmin -----------------
+
+    @DisplayName("updateUserByAdmin_Positive")
+    @Test
+    void updateUserByAdmin_ShouldReturnUpdatedDto_WhenUserExists() {
+        // given
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            UserDto dto = new UserDto();
+            dto.setId(u.getId());
+            dto.setFirstName(u.getFirstName());
+            dto.setLastName(u.getLastName());
+            dto.setEmail(u.getEmail());
+            dto.setBirthDate(u.getBirthDate());
+            return dto;
+        });
+
+        UpdateUserDto updateDto = new UpdateUserDto();
+        updateDto.setFirstName("Ivan");
+        updateDto.setLastName("Vanusha");
+        updateDto.setBirthDate(LocalDate.of(2000,1,1));
+
+        //when
+        UserDto result = userService.updateUserByAdmin(1L, updateDto, "admin@example.com");
+
+        // then
+        assertNotNull(result);
+        assertEquals("Ivan", result.getFirstName());
+        assertEquals("Vanusha", result.getLastName());
+        assertEquals("masha@gmail.com", result.getEmail());
+        assertEquals(LocalDate.of(2000,1,1), result.getBirthDate());
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @DisplayName("updateUserByAdmin_Negative_UserNotFound")
+    @Test
+    void updateUserByAdmin_ShouldThrowUserNotFound_WhenUserNotExists() {
+        // given
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        UpdateUserDto updateDto = new UpdateUserDto();
+        updateDto.setFirstName("Ivan");
+
+        //when & then
+        assertThrows(UserNotFoundException.class, 
+                () -> userService.updateUserByAdmin(999L, updateDto, "admin@example.com"));
     }
 
     // ----------------- deleteUser -----------------
@@ -458,12 +486,12 @@ class UserServiceTest {
 
     // ----------------- updateUser with cards -----------------
 
-    @DisplayName("updateUser_WithCards_ShouldUpdateCards")
+    @DisplayName("updateCurrentUser_WithCards_ShouldUpdateCards")
     @Test
-    void updateUser_WithCards_ShouldUpdateCards() {
+    void updateCurrentUser_WithCards_ShouldUpdateCards() {
         // given
-        // Когда кто-то вызовет userRepository.findById(1L), верни Optional с user
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        // Когда кто-то вызовет userRepository.findByEmailNativeQuery("masha@gmail.com"), верни Optional с user
+        when(userRepository.findByEmailNativeQuery("masha@gmail.com")).thenReturn(Optional.of(user));
         // Устанавливаем пустой список карт для пользователя
         user.setCards(new ArrayList<>()); // пустой список карт
 
@@ -497,9 +525,8 @@ class UserServiceTest {
         updateDto.setCards(null); // null карты — карты не передаются для обновления
 
         //when
-        // Вызываем тестируемый метод обновления пользователя
-        // Используем email пользователя из мока ("masha@gmail.com") для проверки прав доступа
-        UserDto result = userService.updateUser(1L, updateDto, "masha@gmail.com");
+        // Вызываем тестируемый метод обновления пользователя через updateCurrentUser
+        UserDto result = userService.updateCurrentUser("masha@gmail.com", updateDto);
 
         // then
         assertNotNull(result); // Проверка: что результат не null

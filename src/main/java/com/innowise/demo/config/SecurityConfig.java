@@ -59,6 +59,11 @@ public class SecurityConfig {
                         // Эндпоинт для создания пользователя из токена - требует аутентификации
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/createUser").hasAnyRole("ADMIN", "USER")
                         
+                        // Обновление пользователей - доступно для USER и ADMIN
+                        // PUT /api/v1/users/me - для обновления своего профиля (доступно USER и ADMIN)
+                        // PUT /api/v1/users/{id} - для обновления любого пользователя (только ADMIN, проверка в контроллере)
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").hasAnyRole("ADMIN", "USER")
+                        
                         // Удаление пользователей - только ADMIN
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("ADMIN")
                         

@@ -583,119 +583,132 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/v1/users/1 - успешное обновление пользователя")
-    void updateUser_ShouldReturnUpdatedUser() throws Exception {
+    @DisplayName("PUT /api/v1/users/me - успешное обновление текущего пользователя")
+    void updateCurrentUser_ShouldReturnUpdatedUser() throws Exception {
         // given
-        // Создаём DTO для запроса — данные, которые клиент отправляет для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
         updateDto.setFirstName("Updated");
         updateDto.setLastName("User");
         updateDto.setBirthDate(LocalDate.of(1995, 5, 5));
 
-        // Создаём DTO, которое будет возвращать сервис после обновления пользователя
         UserDto updatedDto = new UserDto();
-        updatedDto.setId(1L); // ID пользователя остаётся прежним
+        updatedDto.setId(1L);
+        updatedDto.setFirstName("Updated");
+        updatedDto.setLastName("User");
+        updatedDto.setEmail("test@example.com");
+        updatedDto.setBirthDate(LocalDate.of(1995, 5, 5));
+
+        //when
+        when(userService.updateCurrentUser(eq("test@example.com"), any(UpdateUserDto.class))).thenReturn(updatedDto);
+
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            String email = "test@example.com";
+            JwtAuthenticationToken authentication = createMockAuthentication(email, "USER");
+            mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
+                    .thenReturn(email);
+
+            // then
+            mockMvc.perform(put("/api/v1/users/me")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(updateDto))
+                            .principal(authentication))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(1L))
+                    .andExpect(jsonPath("$.firstName").value("Updated"))
+                    .andExpect(jsonPath("$.email").value("test@example.com"));
+        }
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/users/1 - успешное обновление пользователя админом")
+    void updateUser_ShouldReturnUpdatedUser_WhenAdmin() throws Exception {
+        // given
+        UpdateUserDto updateDto = new UpdateUserDto();
+        updateDto.setFirstName("Updated");
+        updateDto.setLastName("User");
+        updateDto.setBirthDate(LocalDate.of(1995, 5, 5));
+
+        UserDto updatedDto = new UserDto();
+        updatedDto.setId(1L);
         updatedDto.setFirstName("Updated");
         updatedDto.setLastName("User");
         updatedDto.setEmail("updated@example.com");
         updatedDto.setBirthDate(LocalDate.of(1995, 5, 5));
 
         //when
-        // Когда кто-то вызовет userService.updateUser(1L, любой UpdateUserDto, любой String), верни updatedDto
-        when(userService.updateUser(eq(1L), any(UpdateUserDto.class), any(String.class))).thenReturn(updatedDto);
+        when(userService.updateUserByAdmin(eq(1L), any(UpdateUserDto.class), any(String.class))).thenReturn(updatedDto);
 
-        // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
-            String email = "updated@example.com";
-            // Создаём мок аутентификации — как будто пользователь уже залогинен
-            JwtAuthenticationToken authentication = createMockAuthentication(email, "USER");
-            // Когда метод SecurityUtils.getEmailFromToken(authentication) вызвается — возвращай email
-            // Это извлекает email из JWT токена для проверки прав доступа
+            String adminEmail = "admin@example.com";
+            JwtAuthenticationToken authentication = createMockAuthentication(adminEmail, "ADMIN");
             mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
-                    .thenReturn(email);
+                    .thenReturn(adminEmail);
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication))
+                    .thenReturn(true);
 
             // then
-            // Выполняем PUT запрос на /api/v1/users/1 с данными для обновления
             mockMvc.perform(put("/api/v1/users/1")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(updateDto)) //превращение Java-объекта updateDto в JSON-строку, чтобы сервер получил данные для обновления пользователя
-                            .principal(authentication))//задаёт информацию о правах текущего аутентифицированного пользователя для запроса
-                    .andExpect(status().isOk()) // Проверка: что контроллер вернул 200 OK
-                    .andExpect(jsonPath("$.id").value(1L)) // Проверка: ID пользователя остался прежним
-                    .andExpect(jsonPath("$.firstName").value("Updated")) // Проверка: имя обновилось
-                    .andExpect(jsonPath("$.email").value("updated@example.com")); // Проверка: email совпадает
+                            .content(objectMapper.writeValueAsString(updateDto))
+                            .principal(authentication))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(1L))
+                    .andExpect(jsonPath("$.firstName").value("Updated"))
+                    .andExpect(jsonPath("$.email").value("updated@example.com"));
         }
     }
 
     @Test
-    @DisplayName("PUT /api/v1/users/999 - пользователь не найден для обновления")
+    @DisplayName("PUT /api/v1/users/1 - доступ запрещен для обычного пользователя")
+    void updateUser_ShouldReturnForbidden_WhenNotAdmin() throws Exception {
+        // given
+        UpdateUserDto updateDto = new UpdateUserDto();
+        updateDto.setFirstName("Updated");
+
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            String email = "user@example.com";
+            JwtAuthenticationToken authentication = createMockAuthentication(email, "USER");
+            mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
+                    .thenReturn(email);
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication))
+                    .thenReturn(false);
+
+            // then
+            mockMvc.perform(put("/api/v1/users/1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(updateDto))
+                            .principal(authentication))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/users/999 - пользователь не найден для обновления админом")
     void updateUser_ShouldReturnNotFound_WhenUserNotFound() throws Exception {
         // given
-        // Создаём DTO для запроса — данные, которые клиент отправляет для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
         updateDto.setFirstName("Updated");
         updateDto.setLastName("User");
         updateDto.setBirthDate(LocalDate.of(1990, 1, 1));
 
         //when
-        // Когда кто-то вызовет userService.updateUser(999L, любой UpdateUserDto, любой String), выбрось исключение
-        // Это имитирует ситуацию, когда пользователя с таким ID не существует в базе данных
-        when(userService.updateUser(eq(999L), any(UpdateUserDto.class), any(String.class)))
+        when(userService.updateUserByAdmin(eq(999L), any(UpdateUserDto.class), any(String.class)))
                 .thenThrow(new UserNotFoundException("User with id 999 not found!"));
 
-        // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
-            String email = "test@example.com";
-            // Создаём мок аутентификации — как будто пользователь уже залогинен
-            JwtAuthenticationToken authentication = createMockAuthentication(email, "USER");
-            // Когда метод SecurityUtils.getEmailFromToken(authentication) вызвается — возвращай email
+            String adminEmail = "admin@example.com";
+            JwtAuthenticationToken authentication = createMockAuthentication(adminEmail, "ADMIN");
             mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
-                    .thenReturn(email);
+                    .thenReturn(adminEmail);
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication))
+                    .thenReturn(true);
 
             // then
-            // Выполняем PUT запрос на несуществующего пользователя
             mockMvc.perform(put("/api/v1/users/999")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(updateDto))
                             .principal(authentication))
-                    .andExpect(status().isNotFound()); // Проверка: что контроллер вернул 404 Not Found
-        }
-    }
-
-    @Test
-    @DisplayName("PUT /api/v1/users/1 - доступ запрещен при неверном email")
-    void updateUser_ShouldReturnForbidden_WhenAccessDenied() throws Exception {
-        // given
-        // Создаём DTO для запроса — данные, которые клиент отправляет для обновления пользователя
-        UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setFirstName("Updated");
-
-        //when
-        // Когда кто-то вызовет userService.updateUser(1L, любой UpdateUserDto, любой String), выбрось исключение
-        // Это имитирует ситуацию, когда пользователь пытается обновить данные другого пользователя
-        // (email из токена не совпадает с email пользователя, которого пытаются обновить)
-        when(userService.updateUser(eq(1L), any(UpdateUserDto.class), any(String.class)))
-                .thenThrow(new org.springframework.security.access.AccessDeniedException(
-                    "Access denied: You can only update your own information. Please, change Id in url."));
-
-        // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
-        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
-            String email = "test@example.com";
-            // Создаём мок аутентификации — как будто пользователь уже залогинен
-            JwtAuthenticationToken authentication = createMockAuthentication(email, "USER");
-            // Когда метод SecurityUtils.getEmailFromToken(authentication) вызвается — возвращай email
-            mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
-                    .thenReturn(email);
-
-            // then
-            // Выполняем PUT запрос на обновление пользователя с неверным доступом
-            mockMvc.perform(put("/api/v1/users/1")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(updateDto))
-                            .principal(authentication))
-                    .andExpect(status().isForbidden()) // Проверка: что контроллер вернул 403 Forbidden
-                    .andExpect(jsonPath("$.code").value("ACCESS_DENIED")) // Проверка: код ошибки ACCESS_DENIED
-                    .andExpect(jsonPath("$.message").exists()); // Проверка: что сообщение об ошибке присутствует
+                    .andExpect(status().isNotFound());
         }
     }
 

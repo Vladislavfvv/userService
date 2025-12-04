@@ -169,31 +169,59 @@ public class UserService {
     }
 
     /**
-     * Обновляет пользователя. Выполняет частичное обновление - обновляются только переданные поля.
-     * Проверяет права доступа: USER может обновить только свою информацию.
-     * Email берется из токена (не из DTO) для безопасности.
+     * Обновляет текущего пользователя (по email из токена).
+     * Выполняет частичное обновление - обновляются только переданные поля.
+     * Для карт автоматически формируется holder из firstName + lastName пользователя.
+     * 
+     * @param userEmail email пользователя из токена
+     * @param dto DTO с данными для обновления (все поля опциональны)
+     * @return обновленный пользователь
+     * @throws UserNotFoundException если пользователь не найден
+     */
+    @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true)
+    @Transactional
+    public UserDto updateCurrentUser(String userEmail, UpdateUserDto dto) {
+        // Находим пользователя по email из токена
+        User existUser = userRepository.findByEmailNativeQuery(userEmail)
+                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + userEmail + NOT_FOUND_SUFFIX));
+        
+        // Обновляем пользователя (без проверки доступа, так как это свой профиль)
+        return updateUserInternal(existUser, dto);
+    }
+
+    /**
+     * Обновляет пользователя по ID (только для ADMIN).
+     * Админ может обновить любого пользователя без проверки доступа.
+     * Выполняет частичное обновление - обновляются только переданные поля.
      * Для карт автоматически формируется holder из firstName + lastName пользователя.
      * 
      * @param id ID пользователя для обновления
      * @param dto DTO с данными для обновления (все поля опциональны)
-     * @param userEmail email пользователя из токена (для проверки доступа и автоматического заполнения)
+     * @param adminEmail email админа (для логирования)
      * @return обновленный пользователь
-     * @throws AccessDeniedException если пользователь пытается обновить чужую информацию
+     * @throws UserNotFoundException если пользователь не найден
      */
     @CachePut(key = "#id")
     @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true)
     @Transactional
-    public UserDto updateUser(Long id, UpdateUserDto dto, String userEmail) {
-        // Получаем пользователя для проверки доступа
+    public UserDto updateUserByAdmin(Long id, UpdateUserDto dto, String adminEmail) {
+        // Получаем пользователя по ID (без проверки доступа для админа)
         User existUser = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
+        
+        // Обновляем пользователя (без проверки доступа, так как это админ)
+        return updateUserInternal(existUser, dto);
+    }
 
-        // Проверка доступа: email из токена должен совпадать с email пользователя
-        if (!userEmail.equals(existUser.getEmail())) {
-            String message = "Access denied: You can only update your own information.";
-            message += " Please, change Id in url.";
-            throw new org.springframework.security.access.AccessDeniedException(message);
-        }
+    /**
+     * Внутренний метод для обновления пользователя.
+     * Содержит общую логику обновления полей и карт.
+     * 
+     * @param existUser пользователь для обновления
+     * @param dto DTO с данными для обновления
+     * @return обновленный пользователь
+     */
+    private UserDto updateUserInternal(User existUser, UpdateUserDto dto) {
 
         // Частичное обновление - обновляем только переданные поля
         if (dto.getFirstName() != null) {
@@ -296,7 +324,8 @@ public class UserService {
             existUser.getCards().addAll(updatedCards);
         }
 
-        return userMapper.toDto(userRepository.save(existUser));
+        User savedUser = userRepository.save(existUser);
+        return userMapper.toDto(savedUser);
     }
 
     @Caching(evict = {
