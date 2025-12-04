@@ -238,6 +238,37 @@ class UserControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/users/id?id=2 - доступ запрещен для чужого ID")
+    void getUserById_ShouldReturnForbidden_WhenOtherUserId() throws Exception {
+        // given
+        Long requestedId = 2L;
+        UserDto otherUserDto = new UserDto();
+        otherUserDto.setId(2L);
+        otherUserDto.setEmail("other@example.com");
+        otherUserDto.setFirstName("Other");
+        otherUserDto.setLastName("User");
+        
+        // Когда кто-то вызовет userService.findUserById(2L), верни другого пользователя
+        when(userService.findUserById(requestedId)).thenReturn(otherUserDto);
+
+        //when
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            // Создаём мок аутентификации — как будто пользователь уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+            // Мокаем проверку доступа: пользователь не имеет доступа к чужому email
+            mockedSecurityUtils.when(() -> SecurityUtils.hasAccess(authentication, "other@example.com"))
+                    .thenReturn(false);
+
+            // then
+            // Выполняем GET запрос на чужой ID - должен вернуть 403 Forbidden
+            mockMvc.perform(get("/api/v1/users/id")
+                            .param("id", String.valueOf(requestedId))
+                            .principal(authentication))
+                    .andExpect(status().isForbidden()); // Проверка: что контроллер вернул 403 Forbidden
+        }
+    }
+
+    @Test
     @DisplayName("GET /api/v1/users - успешное получение списка пользователей с пагинацией")
     void getUsers_ShouldReturnPagedResponse() throws Exception {
         // given
@@ -529,30 +560,81 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/users/email?email=test@example.com - успешное получение по email")
-    void getUserByEmail_ShouldReturnUser() throws Exception {
+    @DisplayName("GET /api/v1/users/email?email=test@example.com - успешное получение по email (свой email)")
+    void getUserByEmail_ShouldReturnUser_WhenOwnEmail() throws Exception {
         // given
-        // Когда кто-то вызовет userService.getUserByEmail("test@example.com"), верни userDto
-        // (это объект, созданный в setUp() с данными пользователя)
-        when(userService.getUserByEmail("test@example.com")).thenReturn(userDto);
+        String email = "test@example.com";
+        // Когда кто-то вызовет userService.getUserByEmail(email), верни userDto
+        when(userService.getUserByEmail(email)).thenReturn(userDto);
 
         //when
-        // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
             // Создаём мок аутентификации — как будто пользователь уже залогинен
-            JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
-            // Когда метод SecurityUtils.hasAccess(...) вызвается с любым первым аргументом
-            // и "test@example.com" во втором — возвращай true (разрешаем доступ)
-            mockedSecurityUtils.when(() -> SecurityUtils.hasAccess(any(), eq("test@example.com")))
-                    .thenReturn(true);
+            JwtAuthenticationToken authentication = createMockAuthentication(email, "USER");
+            // Мокаем проверку: пользователь не админ
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication)).thenReturn(false);
+            // Мокаем извлечение email из токена
+            mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
+                    .thenReturn(email);
 
             // then
             // Выполняем GET запрос на /api/v1/users/email с параметром email и мокнутой аутентификацией
             mockMvc.perform(get("/api/v1/users/email")
-                            .param("email", "test@example.com")
+                            .param("email", email)
                             .principal(authentication))
                     .andExpect(status().isOk()) // Проверка: что контроллер вернул 200 OK
-                    .andExpect(jsonPath("$.email").value("test@example.com")); // Проверка: email совпадает
+                    .andExpect(jsonPath("$.email").value(email)); // Проверка: email совпадает
+        }
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/email?email=other@example.com - доступ запрещен для чужого email")
+    void getUserByEmail_ShouldReturnForbidden_WhenOtherUserEmail() throws Exception {
+        // given
+        String userEmail = "test@example.com";
+        String requestedEmail = "other@example.com";
+
+        //when
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            // Создаём мок аутентификации — как будто пользователь уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication(userEmail, "USER");
+            // Мокаем проверку: пользователь не админ
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication)).thenReturn(false);
+            // Мокаем извлечение email из токена
+            mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
+                    .thenReturn(userEmail);
+
+            // then
+            // Выполняем GET запрос на чужой email - должен вернуть 403 Forbidden
+            mockMvc.perform(get("/api/v1/users/email")
+                            .param("email", requestedEmail)
+                            .principal(authentication))
+                    .andExpect(status().isForbidden()); // Проверка: что контроллер вернул 403 Forbidden
+        }
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/email?email=test@example.com - админ может получить любого пользователя")
+    void getUserByEmail_ShouldReturnUser_WhenAdmin() throws Exception {
+        // given
+        String email = "test@example.com";
+        // Когда кто-то вызовет userService.getUserByEmail(email), верни userDto
+        when(userService.getUserByEmail(email)).thenReturn(userDto);
+
+        //when
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            // Создаём мок аутентификации — как будто админ уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication("admin@example.com", "ADMIN");
+            // Мокаем проверку: пользователь админ
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication)).thenReturn(true);
+
+            // then
+            // Выполняем GET запрос на /api/v1/users/email с параметром email и мокнутой аутентификацией
+            mockMvc.perform(get("/api/v1/users/email")
+                            .param("email", email)
+                            .principal(authentication))
+                    .andExpect(status().isOk()) // Проверка: что контроллер вернул 200 OK
+                    .andExpect(jsonPath("$.email").value(email)); // Проверка: email совпадает
         }
     }
 
@@ -560,23 +642,25 @@ class UserControllerTest {
     @DisplayName("GET /api/v1/users/email - пользователь не найден по email")
     void getUserByEmail_ShouldReturnNotFound_WhenUserNotFound() throws Exception {
         // given & when
-        // Когда кто-то вызовет userService.getUserByEmail("notfound@example.com"), выбрось исключение
+        String email = "notfound@example.com";
+        // Когда кто-то вызовет userService.getUserByEmail(email), выбрось исключение
         // Это имитирует ситуацию, когда пользователя с таким email не существует в базе данных
-        when(userService.getUserByEmail("notfound@example.com"))
-                .thenThrow(new UserNotFoundException("User with email notfound@example.com not found!"));
+        when(userService.getUserByEmail(email))
+                .thenThrow(new UserNotFoundException("User with email " + email + " not found!"));
 
-        // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
             // Создаём мок аутентификации — как будто пользователь уже залогинен
-            JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
-            // Когда метод SecurityUtils.hasAccess(...) вызвается с любыми аргументами — возвращай true
-            mockedSecurityUtils.when(() -> SecurityUtils.hasAccess(any(), any()))
-                    .thenReturn(true);
+            JwtAuthenticationToken authentication = createMockAuthentication(email, "USER");
+            // Мокаем проверку: пользователь не админ
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication)).thenReturn(false);
+            // Мокаем извлечение email из токена (пользователь запрашивает свой email, но его нет в БД)
+            mockedSecurityUtils.when(() -> SecurityUtils.getEmailFromToken(authentication))
+                    .thenReturn(email);
 
             // then
             // Выполняем GET запрос на несуществующего пользователя по email
             mockMvc.perform(get("/api/v1/users/email")
-                            .param("email", "notfound@example.com")
+                            .param("email", email)
                             .principal(authentication))
                     .andExpect(status().isNotFound()); // Проверка: что контроллер вернул 404 Not Found
         }

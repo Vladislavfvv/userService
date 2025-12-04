@@ -118,14 +118,19 @@ public class UserController {
      */
     @GetMapping("/email")
     public ResponseEntity<UserDto> getUserByEmail(
-            @RequestParam(required = false) String email,
+            @RequestParam String email,
             Authentication authentication) {
-        UserDto user = userService.getUserByEmail(email);
-        
-        // Проверка доступа: USER может получить только свою информацию
-        if (!SecurityUtils.hasAccess(authentication, user.getEmail())) {
-            throw new AccessDeniedException("Access denied: You can only access your own information");
+        // Проверка доступа ДО получения пользователя из базы
+        // USER может запрашивать только свой email
+        if (!SecurityUtils.isAdmin(authentication)) {
+            String userEmail = SecurityUtils.getEmailFromToken(authentication);
+            if (!userEmail.equals(email)) {
+                throw new AccessDeniedException("Access denied: You can only access your own information");
+            }
         }
+        
+        // Получаем пользователя из базы только после проверки доступа
+        UserDto user = userService.getUserByEmail(email);
         
         return ResponseEntity.ok(user);
     }
