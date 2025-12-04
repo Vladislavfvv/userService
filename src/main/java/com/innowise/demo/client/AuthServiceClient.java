@@ -85,26 +85,54 @@ public class AuthServiceClient {
      * Удаление пользователя по email из authentication-service (auth_db и Keycloak)
      */
     public void deleteUser(String email) {
-        if (baseUrl == null || baseUrl.isBlank() || internalApiKey == null || internalApiKey.isBlank()) {
-            log.warn("Authentication service URL or internal API key not configured. Skipping user deletion in authentication-service.");
+        log.info("Attempting to delete user {} from authentication-service", email);
+        log.info("AuthServiceClient configuration - baseUrl: {}, internalApiKey configured: {}", 
+                baseUrl, internalApiKey != null && !internalApiKey.isBlank());
+        
+        if (baseUrl == null || baseUrl.isBlank()) {
+            log.warn("Authentication service URL not configured. Skipping user deletion in authentication-service.");
             return;
         }
 
+        // Внутренний API ключ опционален - endpoint может работать без него
+        // Но лучше настроить его для безопасности
         HttpHeaders headers = new HttpHeaders();
         if (internalApiKey != null && !internalApiKey.isBlank()) {
             headers.set(INTERNAL_API_KEY_HEADER, internalApiKey);
+            log.info("Using internal API key for authentication-service request (key length: {})", internalApiKey.length());
+        } else {
+            log.warn("Internal API key not configured. Request will be sent without API key.");
         }
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         try {
-            // URL-кодируем email для использования в path
-            String encodedEmail = java.net.URLEncoder.encode(email, java.nio.charset.StandardCharsets.UTF_8);
-            restTemplate.exchange(baseUrl + "/auth/users/" + encodedEmail, HttpMethod.DELETE, entity, Void.class);
-            log.info("Successfully deleted user {} from authentication-service", email);
-        } catch (RestClientException ex) {
-            log.error("Failed to delete user {} from authentication-service: {}", email, ex.getMessage(), ex);
+            // Используем UriComponentsBuilder для правильного кодирования URL
+            // RestTemplate автоматически кодирует URL, поэтому не нужно кодировать вручную
+            String url = org.springframework.web.util.UriComponentsBuilder
+                    .fromUriString(baseUrl)
+                    .path("/auth/v1/internal/sync/users/{email}")
+                    .buildAndExpand(email)
+                    .toUriString();
+            log.info("Calling DELETE {} for user {}", url, email);
+            
+            ResponseEntity<Void> response = restTemplate.exchange(url, HttpMethod.DELETE, entity, Void.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("Successfully deleted user {} from authentication-service. Response status: {}", email, response.getStatusCode());
+            } else {
+                log.warn("Unexpected response status {} when deleting user {} from authentication-service", response.getStatusCode(), email);
+            }
+        } catch (org.springframework.web.client.HttpClientErrorException ex) {
+            log.error("HTTP error when deleting user {} from authentication-service. Status: {}, Response: {}", 
+                    email, ex.getStatusCode(), ex.getResponseBodyAsString(), ex);
             // Не выбрасываем исключение, чтобы не прерывать удаление в user-service
+        } catch (RestClientException ex) {
+            log.error("Failed to delete user {} from authentication-service. URL: {}. Error: {}", 
+                    email, baseUrl + "/auth/v1/internal/sync/users/" + email, ex.getMessage(), ex);
+            // Не выбрасываем исключение, чтобы не прерывать удаление в user-service
+        } catch (Exception ex) {
+            log.error("Unexpected error while deleting user {} from authentication-service: {}", email, ex.getMessage(), ex);
         }
     }
 

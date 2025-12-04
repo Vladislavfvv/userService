@@ -33,6 +33,7 @@ import com.innowise.demo.repository.UserRepository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -242,9 +243,9 @@ class CardInfoServiceTest {
         assertEquals(1, result.getContent().size()); // Проверка: что в результате 1 карта
     }
 
-    @DisplayName("getALLCardInfo_Negative")
+    @DisplayName("getAllCardInfos_ShouldReturnEmptyPage_WhenNoCards")
     @Test
-    void getAllCardInfos_ShouldThrow_WhenEmpty() {
+    void getAllCardInfos_ShouldReturnEmptyPage_WhenNoCards() {
         // given
         // Мокируем аутентификацию для ADMIN (чтобы использовался findAll)
         JwtAuthenticationToken authentication = createMockAuthentication("admin@example.com", "ADMIN");
@@ -255,10 +256,15 @@ class CardInfoServiceTest {
         // Когда кто-то вызовет cardInfoRepository.findAll(PageRequest.of(0, 10)), верни пустую страницу
         when(cardInfoRepository.findAll(PageRequest.of(0, 10))).thenReturn(emptyPage);
 
-        //when & then
-        // Проверка: что метод выбросит исключение CardInfoNotFoundException
-        // (нельзя получить список карт, если их нет в базе данных)
-        assertThrows(CardInfoNotFoundException.class, () -> cardInfoService.getAllCardInfos(0, 10));
+        //when
+        // Вызываем метод получения всех карт
+        Page<CardInfoDto> result = cardInfoService.getAllCardInfos(0, 10);
+
+        //then
+        // Проверка: что метод возвращает пустую страницу (это нормальная ситуация, когда карт нет)
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        assertEquals(0, result.getTotalElements());
     }
 
     @DisplayName("updateCardInfo_Positive")

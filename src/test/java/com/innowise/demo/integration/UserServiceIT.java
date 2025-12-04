@@ -55,8 +55,8 @@ class UserServiceIT extends BaseIntegrationTest{
         // Создаём тестовый DTO для использования в интеграционных тестах
         // В интеграционных тестах мы работаем с реальной базой данных через Testcontainers
         userDto = new UserDto();
-        userDto.setName("Integration");
-        userDto.setSurname("Test");
+        userDto.setFirstName("Integration");
+        userDto.setLastName("Test");
         userDto.setEmail("integration@example.com");
         userDto.setBirthDate(LocalDate.of(1995, 5, 5));
     }
@@ -127,30 +127,54 @@ class UserServiceIT extends BaseIntegrationTest{
 
     @Test
     @Order(5)
-    void updateUser_ShouldModifyData() {
+    void updateCurrentUser_ShouldModifyData() {
         // given
         // Сохраняем пользователя напрямую в репозиторий для подготовки данных
         User saved = userRepository.save(userMapper.toEntity(userDto));
 
         // Создаём DTO с данными для обновления пользователя
         UpdateUserDto updateDto = new UpdateUserDto();
-        updateDto.setName("Updated"); // новое имя
-        updateDto.setSurname("User"); // новая фамилия
+        updateDto.setFirstName("Updated"); // новое имя
+        updateDto.setLastName("User"); // новая фамилия
         updateDto.setBirthDate(LocalDate.of(1990, 1, 1)); // новая дата рождения
 
         //when
-        // Вызываем тестируемый метод обновления пользователя
-        // Используем email сохранённого пользователя для проверки прав доступа
+        // Вызываем тестируемый метод обновления текущего пользователя
+        // Используем email сохранённого пользователя (ID берется из токена)
         // В интеграционном тесте это реальное обновление данных в базе данных
-        UserDto updated = userService.updateUser(saved.getId(), updateDto, saved.getEmail());
+        UserDto updated = userService.updateCurrentUser(saved.getEmail(), updateDto);
 
         // then
-        assertEquals("Updated", updated.getName()); // Проверка: что имя обновилось
+        assertEquals("Updated", updated.getFirstName()); // Проверка: что имя обновилось
         assertEquals(saved.getEmail(), updated.getEmail()); // Проверка: что email не изменился (берётся из токена)
     }
 
     @Test
     @Order(6)
+    void updateUserByAdmin_ShouldModifyData() {
+        // given
+        // Сохраняем пользователя напрямую в репозиторий для подготовки данных
+        User saved = userRepository.save(userMapper.toEntity(userDto));
+
+        // Создаём DTO с данными для обновления пользователя
+        UpdateUserDto updateDto = new UpdateUserDto();
+        updateDto.setFirstName("AdminUpdated"); // новое имя
+        updateDto.setLastName("AdminUser"); // новая фамилия
+        updateDto.setBirthDate(LocalDate.of(1985, 6, 15)); // новая дата рождения
+
+        //when
+        // Вызываем тестируемый метод обновления пользователя админом
+        // Админ может обновить любого пользователя по ID
+        // В интеграционном тесте это реальное обновление данных в базе данных
+        UserDto updated = userService.updateUserByAdmin(saved.getId(), updateDto, "admin@example.com");
+
+        // then
+        assertEquals("AdminUpdated", updated.getFirstName()); // Проверка: что имя обновилось
+        assertEquals(saved.getEmail(), updated.getEmail()); // Проверка: что email не изменился
+    }
+
+    @Test
+    @Order(7)
     void deleteUser_ShouldRemoveFromDatabase() {
         // given
         // Сохраняем пользователя напрямую в репозиторий для подготовки данных

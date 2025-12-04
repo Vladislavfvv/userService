@@ -28,6 +28,7 @@ import com.innowise.demo.model.CardInfo;
 import com.innowise.demo.model.User;
 import com.innowise.demo.repository.CardInfoRepository;
 import com.innowise.demo.repository.UserRepository;
+import com.innowise.demo.client.AuthServiceClient;
 
 import lombok.RequiredArgsConstructor;
 
@@ -38,6 +39,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final CardInfoRepository cardInfoRepository;
+    private final AuthServiceClient authServiceClient;
 
     private static final String NOT_FOUND_SUFFIX = " not found!";
     private static final String USER_WITH_EMAIL = "User with email ";
@@ -50,7 +52,7 @@ public class UserService {
      * остальные данные из запроса.
      * 
      * @param email email пользователя, извлеченный из JWT токена
-     * @param request данные пользователя (name, surname, birthDate)
+     * @param request данные пользователя (firstName, lastName, birthDate)
      * @return созданный пользователь
      * @throws UserAlreadyExistsException если пользователь с таким email уже существует
      */
@@ -65,8 +67,8 @@ public class UserService {
         // Создаем DTO с email из токена и данными из запроса
         UserDto userDto = new UserDto();
         userDto.setEmail(email);
-        userDto.setName(request.getName());
-        userDto.setSurname(request.getSurname());
+        userDto.setFirstName(request.getFirstName());
+        userDto.setLastName(request.getLastName());
         userDto.setBirthDate(request.getBirthDate());
         userDto.setCards(null); // Карты можно добавить позже через отдельный endpoint
 
@@ -167,48 +169,76 @@ public class UserService {
     }
 
     /**
-     * Обновляет пользователя. Выполняет частичное обновление - обновляются только переданные поля.
-     * Проверяет права доступа: USER может обновить только свою информацию.
-     * Email берется из токена (не из DTO) для безопасности.
-     * Для карт автоматически формируется holder из name + surname пользователя.
+     * Обновляет текущего пользователя (по email из токена).
+     * Выполняет частичное обновление - обновляются только переданные поля.
+     * Для карт автоматически формируется holder из firstName + lastName пользователя.
+     * 
+     * @param userEmail email пользователя из токена
+     * @param dto DTO с данными для обновления (все поля опциональны)
+     * @return обновленный пользователь
+     * @throws UserNotFoundException если пользователь не найден
+     */
+    @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true)
+    @Transactional
+    public UserDto updateCurrentUser(String userEmail, UpdateUserDto dto) {
+        // Находим пользователя по email из токена
+        User existUser = userRepository.findByEmailNativeQuery(userEmail)
+                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + userEmail + NOT_FOUND_SUFFIX));
+        
+        // Обновляем пользователя (без проверки доступа, так как это свой профиль)
+        return updateUserInternal(existUser, dto);
+    }
+
+    /**
+     * Обновляет пользователя по ID (только для ADMIN).
+     * Админ может обновить любого пользователя без проверки доступа.
+     * Выполняет частичное обновление - обновляются только переданные поля.
+     * Для карт автоматически формируется holder из firstName + lastName пользователя.
      * 
      * @param id ID пользователя для обновления
      * @param dto DTO с данными для обновления (все поля опциональны)
-     * @param userEmail email пользователя из токена (для проверки доступа и автоматического заполнения)
+     * @param adminEmail email админа (для логирования)
      * @return обновленный пользователь
-     * @throws AccessDeniedException если пользователь пытается обновить чужую информацию
+     * @throws UserNotFoundException если пользователь не найден
      */
     @CachePut(key = "#id")
     @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true)
     @Transactional
-    public UserDto updateUser(Long id, UpdateUserDto dto, String userEmail) {
-        // Получаем пользователя для проверки доступа
+    public UserDto updateUserByAdmin(Long id, UpdateUserDto dto, String adminEmail) {
+        // Получаем пользователя по ID (без проверки доступа для админа)
         User existUser = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
+        
+        // Обновляем пользователя (без проверки доступа, так как это админ)
+        return updateUserInternal(existUser, dto);
+    }
 
-        // Проверка доступа: email из токена должен совпадать с email пользователя
-        if (!userEmail.equals(existUser.getEmail())) {
-            String message = "Access denied: You can only update your own information.";
-            message += " Please, change Id in url.";
-            throw new org.springframework.security.access.AccessDeniedException(message);
-        }
+    /**
+     * Внутренний метод для обновления пользователя.
+     * Содержит общую логику обновления полей и карт.
+     * 
+     * @param existUser пользователь для обновления
+     * @param dto DTO с данными для обновления
+     * @return обновленный пользователь
+     */
+    private UserDto updateUserInternal(User existUser, UpdateUserDto dto) {
 
         // Частичное обновление - обновляем только переданные поля
-        if (dto.getName() != null) {
-            existUser.setName(dto.getName());
+        if (dto.getFirstName() != null) {
+            existUser.setFirstName(dto.getFirstName());
         }
-        if (dto.getSurname() != null) {
-            existUser.setSurname(dto.getSurname());
+        if (dto.getLastName() != null) {
+            existUser.setLastName(dto.getLastName());
         }
         if (dto.getBirthDate() != null) {
             existUser.setBirthDate(dto.getBirthDate());
         }
         // Email не обновляется - он берется из токена и не должен изменяться через этот endpoint
 
-        // Автоматически формируем holder для карт из name + surname (после обновления полей)
-        String holder = (existUser.getName() != null ? existUser.getName() : "") + 
+        // Автоматически формируем holder для карт из firstName + lastName (после обновления полей)
+        String holder = (existUser.getFirstName() != null ? existUser.getFirstName() : "") + 
                         " " + 
-                        (existUser.getSurname() != null ? existUser.getSurname() : "");
+                        (existUser.getLastName() != null ? existUser.getLastName() : "");
         holder = holder.trim();
         
         // Если holder пустой, используем email как fallback
@@ -294,7 +324,8 @@ public class UserService {
             existUser.getCards().addAll(updatedCards);
         }
 
-        return userMapper.toDto(userRepository.save(existUser));
+        User savedUser = userRepository.save(existUser);
+        return userMapper.toDto(savedUser);
     }
 
     @Caching(evict = {
@@ -303,9 +334,31 @@ public class UserService {
     })
     @Transactional
     public void deleteUser(Long id) {
-        userRepository.findById(id)
+        // Получаем пользователя для извлечения email перед удалением
+        User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
 
+        String email = user.getEmail();
+
+        // Удаляем из user-service базы данных
         userRepository.deleteById(id);
+
+        // Удаляем из authentication-service (auth_db) для синхронизации
+        // Это позволяет пользователю зарегистрироваться снова с тем же email
+        if (email != null && !email.isBlank()) {
+            org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(UserService.class);
+            log.info("Attempting to delete user {} from authentication-service after deletion from user-service", email);
+            try {
+                authServiceClient.deleteUser(email);
+                // Успешное удаление логируется внутри AuthServiceClient
+            } catch (Exception e) {
+                // Логируем ошибку, но не прерываем удаление из user-service
+                // Пользователь уже удален из us_db, даже если удаление из auth_db не удалось
+                log.error("Failed to delete user {} from authentication-service: {}", email, e.getMessage(), e);
+            }
+        } else {
+            org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(UserService.class);
+            log.warn("Cannot delete user from authentication-service: email is null or blank");
+        }
     }
 }

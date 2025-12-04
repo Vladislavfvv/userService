@@ -77,22 +77,14 @@ public class CardInfoController {
     /**
      * Получение списка всех карт.
      * ADMIN: может получить все карты.
-     * USER: может получить только свои карты (нужно добавить фильтрацию в сервисе).
-     * 
-     * TODO: Добавить фильтрацию по пользователю для USER роли в сервисе.
+     * USER: может получить только свои карты (фильтрация выполняется в сервисе).
      */
     @GetMapping
     public ResponseEntity<Page<CardInfoDto>> getAllCardInfos(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             Authentication authentication) {
-        // Если USER, нужно фильтровать только его карты
-        // Пока возвращаем все карты (ADMIN может видеть все)
-        // TODO: Добавить метод в сервисе для получения карт по userId
-        if (!SecurityUtils.isAdmin(authentication)) {
-            throw new AccessDeniedException("Access denied: Only ADMIN can view all cards. Use GET /api/v1/cards/{id} to view your own cards");
-        }
-        
+        // Сервис сам отфильтрует карты: ADMIN получит все карты, USER - только свои
         return ResponseEntity.ok(cardInfoService.getAllCardInfos(page, size));
     }
 
@@ -120,21 +112,20 @@ public class CardInfoController {
 
     /**
      * Удаление карты.
-     * ADMIN: может удалить любую карту.
-     * USER: может удалить только свои карты.
+     * Только ADMIN может удалять карты.
+     * USER не может удалять даже свои карты.
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCardInfo(
             @PathVariable Long id,
             Authentication authentication) {
-        // Получаем текущую карту для проверки доступа
-        CardInfoDto currentCard = cardInfoService.getCardInfoById(id);
-        UserDto cardOwner = userService.findUserById(currentCard.getUserId());
-        
-        // Проверка доступа: USER может удалить только свои карты
-        if (!SecurityUtils.hasAccess(authentication, cardOwner.getEmail())) {
-            throw new AccessDeniedException("Access denied: You can only delete your own cards");
+        // Проверка доступа: только ADMIN может удалять карты
+        if (!SecurityUtils.isAdmin(authentication)) {
+            throw new AccessDeniedException("Access denied: Only administrators can delete cards");
         }
+        
+        // Проверяем, что карта существует
+        cardInfoService.getCardInfoById(id);
         
         cardInfoService.deleteCardInfo(id);
         return ResponseEntity.noContent().build();

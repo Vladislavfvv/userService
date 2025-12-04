@@ -35,8 +35,11 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name;
-    private String surname;
+    @Column(name = "name")
+    private String firstName;
+    
+    @Column(name = "surname")
+    private String lastName;
 
     @Column(name = "birth_date")
     private LocalDate birthDate;

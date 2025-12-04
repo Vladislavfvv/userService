@@ -56,7 +56,7 @@ public class UserController {
      * Email извлекается из токена (claim "sub"), остальные данные из тела запроса.
      * Пользователь должен быть зарегистрирован в auth-service и иметь валидный JWT токен.
      * 
-     * @param request данные пользователя (name, surname, birthDate)
+     * @param request данные пользователя (firstName, lastName, birthDate)
      * @param authentication объект аутентификации, содержащий JWT токен
      * @return созданный пользователь
      */
@@ -118,61 +118,102 @@ public class UserController {
      */
     @GetMapping("/email")
     public ResponseEntity<UserDto> getUserByEmail(
-            @RequestParam(required = false) String email,
+            @RequestParam String email,
             Authentication authentication) {
-        UserDto user = userService.getUserByEmail(email);
-        
-        // Проверка доступа: USER может получить только свою информацию
-        if (!SecurityUtils.hasAccess(authentication, user.getEmail())) {
-            throw new AccessDeniedException("Access denied: You can only access your own information");
+        // Проверка доступа ДО получения пользователя из базы
+        // USER может запрашивать только свой email
+        if (!SecurityUtils.isAdmin(authentication)) {
+            String userEmail = SecurityUtils.getEmailFromToken(authentication);
+            if (!userEmail.equals(email)) {
+                throw new AccessDeniedException("Access denied: You can only access your own information");
+            }
         }
+        
+        // Получаем пользователя из базы только после проверки доступа
+        UserDto user = userService.getUserByEmail(email);
         
         return ResponseEntity.ok(user);
     }
 
     /**
-     * Обновление пользователя.
-     * ADMIN: может обновить любого пользователя.
-     * USER: может обновить только свою информацию.
+     * Обновление текущего пользователя (свой профиль).
+     * ID берется из JWT токена (по email).
      * Выполняет частичное обновление - обновляются только переданные поля.
      * Email берется из токена, holder для карт автоматически формируется из name + surname.
-     * Проверка доступа выполняется в сервисе.
+     */
+    @PutMapping("/me")
+    public ResponseEntity<UserDto> updateCurrentUser(
+            @RequestBody UpdateUserDto dto,
+            Authentication authentication) {
+        // Извлекаем email из токена
+        String userEmail;
+        try {
+            userEmail = SecurityUtils.getEmailFromToken(authentication);
+        } catch (IllegalStateException e) {
+            throw new AccessDeniedException("Access denied: Authentication required.");
+        }
+        
+        // Находим пользователя по email и обновляем его
+        return ResponseEntity.ok(userService.updateCurrentUser(userEmail, dto));
+    }
+
+    /**
+     * Обновление пользователя по ID (только для ADMIN).
+     * ADMIN может обновить любого пользователя.
+     * Выполняет частичное обновление - обновляются только переданные поля.
+     * Holder для карт автоматически формируется из name + surname.
      */
     @PutMapping("/{id}")
     public ResponseEntity<UserDto> updateUser(
             @PathVariable Long id,
             @RequestBody UpdateUserDto dto,
             Authentication authentication) {
-        // Извлекаем email из токена для передачи в сервис
-        String userEmail;
-        try {
-            userEmail = SecurityUtils.getEmailFromToken(authentication);
-        } catch (IllegalStateException e) {
-            throw new AccessDeniedException("Access denied: You can only update your own information.");
+        // Проверка доступа: только ADMIN может обновлять пользователей по ID
+        if (!SecurityUtils.isAdmin(authentication)) {
+            throw new AccessDeniedException("Access denied: Only administrators can update users by ID. " +
+                    "Use PUT /api/v1/users/me to update your own profile.");
         }
         
-        // Сервис сам проверит права доступа и выбросит исключение при необходимости
-        return ResponseEntity.ok(userService.updateUser(id, dto, userEmail));
+        // Извлекаем email админа для логирования
+        String adminEmail;
+        try {
+            adminEmail = SecurityUtils.getEmailFromToken(authentication);
+        } catch (IllegalStateException e) {
+            throw new AccessDeniedException("Access denied: Authentication required.");
+        }
+        
+        // Админ может обновить любого пользователя (проверка доступа не требуется)
+        return ResponseEntity.ok(userService.updateUserByAdmin(id, dto, adminEmail));
     }
 
     /**
      * Удаление пользователя.
-     * ADMIN: может удалить любого пользователя.
-     * USER: может удалить только свою информацию.
+     * Только ADMIN может удалять пользователей.
+     * USER не может удалять даже свои данные.
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(
             @PathVariable Long id,
             Authentication authentication) {
-        // Получаем текущего пользователя для проверки доступа
-        UserDto currentUser = userService.findUserById(id);
+        log.info("Delete user request received for user ID: {} by user: {}", id, 
+                authentication != null ? SecurityUtils.getEmailFromToken(authentication) : "unknown");
         
-        // Проверка доступа: USER может удалить только свою информацию
-        if (!SecurityUtils.hasAccess(authentication, currentUser.getEmail())) {
-            throw new AccessDeniedException("Access denied: You can only delete your own information");
+        // Проверка доступа: только ADMIN может удалять пользователей
+        if (!SecurityUtils.isAdmin(authentication)) {
+            log.warn("Access denied: User {} attempted to delete user ID: {}", 
+                    SecurityUtils.getEmailFromToken(authentication), id);
+            throw new AccessDeniedException("Access denied: Only administrators can delete users");
         }
         
+        log.info("Admin user {} is deleting user ID: {}", SecurityUtils.getEmailFromToken(authentication), id);
+        
+        // Проверяем, что пользователь существует и получаем email для синхронизации
+        UserDto userToDelete = userService.findUserById(id);
+        log.info("User to delete found: {} (email: {})", id, userToDelete.getEmail());
+        
         userService.deleteUser(id);
+        log.info("User ID: {} successfully deleted from user-service", id);
+        
         return ResponseEntity.noContent().build();
     }
 }

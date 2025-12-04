@@ -427,11 +427,10 @@ class CardInfoControllerTest {
 
         // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
-            // Создаём мок аутентификации — как будто пользователь уже залогинен
-            JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
-            // Когда метод SecurityUtils.hasAccess(...) вызвается с любым первым аргументом
-            // и "test@example.com" во втором — возвращай true (разрешаем доступ)
-            mockedSecurityUtils.when(() -> SecurityUtils.hasAccess(any(), eq("test@example.com")))
+            // Создаём мок аутентификации — как будто администратор уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication("admin@example.com", "ADMIN");
+            // Когда метод SecurityUtils.isAdmin(...) вызвается — возвращай true (пользователь является администратором)
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication))
                     .thenReturn(true);
 
             // then
@@ -455,8 +454,11 @@ class CardInfoControllerTest {
 
         // Внутри этого блока try — все вызовы SecurityUtils будут мокнутыми
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
-            // Создаём мок аутентификации — как будто пользователь уже залогинен
-            JwtAuthenticationToken authentication = createMockAuthentication("test@example.com", "USER");
+            // Создаём мок аутентификации — как будто администратор уже залогинен
+            JwtAuthenticationToken authentication = createMockAuthentication("admin@example.com", "ADMIN");
+            // Когда метод SecurityUtils.isAdmin(...) вызвается — возвращай true (пользователь является администратором)
+            mockedSecurityUtils.when(() -> SecurityUtils.isAdmin(authentication))
+                    .thenReturn(true);
 
             // then
             // Выполняем DELETE запрос на несуществующую карту
