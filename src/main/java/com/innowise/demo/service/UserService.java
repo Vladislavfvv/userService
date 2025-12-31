@@ -31,7 +31,9 @@ import com.innowise.demo.repository.UserRepository;
 import com.innowise.demo.client.AuthServiceClient;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @CacheConfig(cacheNames = "users") // общий префикс для всех методов
@@ -56,11 +58,21 @@ public class UserService {
      * @return созданный пользователь
      * @throws UserAlreadyExistsException если пользователь с таким email уже существует
      */
-    @CachePut(key = "#result.id")
-    @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true)
+    @Caching(
+        put = @CachePut(key = "#result.id"),
+        evict = {
+            @CacheEvict(value = "users_all", allEntries = true),
+            @CacheEvict(value = "users_by_email", allEntries = true),
+            @CacheEvict(value = "users", allEntries = true)
+        }
+    )
     public UserDto createUserFromToken(String email, CreateUserFromTokenRequest request) {
+        log.info("Creating user from token in database: email={}, firstName={}, lastName={}", 
+                email, request.getFirstName(), request.getLastName());
+        
         // Проверка на уникальность email из токена
         if (userRepository.findByEmailNativeQuery(email).isPresent()) {
+            log.warn("User creation from token failed: email {} already exists", email);
             throw new UserAlreadyExistsException(USER_WITH_EMAIL + email + " already exists");
         }
 
@@ -78,13 +90,25 @@ public class UserService {
 
         // Hibernate сохранит пользователя
         User saved = userRepository.save(entity);
+        
+        log.info("User from token successfully saved to database: id={}, email={}, firstName={}, lastName={}", 
+                saved.getId(), saved.getEmail(), saved.getFirstName(), saved.getLastName());
 
         return userMapper.toDto(saved);
     }
 
-    @CachePut(key = "#result.id")
-    @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true) // очищаем кэш списка и по email
+    @Caching(
+        put = @CachePut(key = "#result.id"),
+        evict = {
+            @CacheEvict(value = "users_all", allEntries = true),
+            @CacheEvict(value = "users_by_email", allEntries = true),
+            @CacheEvict(value = "users", allEntries = true)
+        }
+    )
     public UserDto createUser(UserDto dto) {
+        log.info("Creating user in database: email={}, firstName={}, lastName={}", 
+                dto.getEmail(), dto.getFirstName(), dto.getLastName());
+        
         dto.setId(null);
         if (dto.getCards() != null) {
             dto.getCards().forEach(c -> c.setId(null));
@@ -92,6 +116,7 @@ public class UserService {
 
         // Проверка на уникальность email
         if (userRepository.findByEmailNativeQuery(dto.getEmail()).isPresent()) {
+            log.warn("User creation failed: email {} already exists", dto.getEmail());
             throw new UserAlreadyExistsException(USER_WITH_EMAIL + dto.getEmail() + " already exists");
         }
 
@@ -105,6 +130,9 @@ public class UserService {
 
         // Hibernate сохранит и пользователя, и все его карты (CascadeType.ALL)
         User saved = userRepository.save(entity);
+        
+        log.info("User successfully saved to database: id={}, email={}, firstName={}, lastName={}", 
+                saved.getId(), saved.getEmail(), saved.getFirstName(), saved.getLastName());
 
         return userMapper.toDto(saved);
     }
@@ -120,7 +148,7 @@ public class UserService {
         return userMapper.toDto(user);
     }
 
-    @Cacheable(value = "users_all", key = "'page_' + #page + '_size_' + #size")
+    //@Cacheable(value = "users_all", key = "'page_' + #page + '_size_' + #size")
     @Transactional(readOnly = true)//длф решения проблемы ленивой инициализации
     public PagedUserResponse findAllUsers(int page, int size) {
         Page<User> users = userRepository.findAll(PageRequest.of(page, size));
@@ -142,9 +170,34 @@ public class UserService {
     @Cacheable(value = "users_by_email", key = "#email")
     @Transactional(readOnly = true)
     public UserDto getUserByEmail(String email) {
-        User user = userRepository.findByEmailNamed(email)
-                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + email + NOT_FOUND_SUFFIX));
+        log.debug("Searching for user with email: {}", email);
+        
+        // Используем native query для более надежного поиска
+        // Пробуем сначала native query, затем JPQL, затем named query
+        Optional<User> userOpt = userRepository.findByEmailNativeQuery(email);
+        if (userOpt.isPresent()) {
+            log.debug("User found using native query: {}", email);
+        } else {
+            log.debug("User not found using native query, trying JPQL: {}", email);
+            userOpt = userRepository.findByEmailJPQL(email);
+            if (userOpt.isPresent()) {
+                log.debug("User found using JPQL: {}", email);
+            } else {
+                log.debug("User not found using JPQL, trying named query: {}", email);
+                userOpt = userRepository.findByEmailNamed(email);
+                if (userOpt.isPresent()) {
+                    log.debug("User found using named query: {}", email);
+                }
+            }
+        }
+        
+        User user = userOpt
+                .orElseThrow(() -> {
+                    log.error("User not found with email: {} (tried all query methods)", email);
+                    return new UserNotFoundException(USER_WITH_EMAIL + email + NOT_FOUND_SUFFIX);
+                });
 
+        log.debug("User found: id={}, email={}", user.getId(), user.getEmail());
         return userMapper.toDto(user);
     }
 
@@ -178,15 +231,50 @@ public class UserService {
      * @return обновленный пользователь
      * @throws UserNotFoundException если пользователь не найден
      */
-    @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true)
+//    @Caching(
+//        evict = {
+//            @CacheEvict(value = "users_all", allEntries = true),
+//            @CacheEvict(value = "users_by_email", allEntries = true),
+//            @CacheEvict(value = "users", allEntries = true)
+//        }
+//    )
     @Transactional
     public UserDto updateCurrentUser(String userEmail, UpdateUserDto dto) {
+        log.info("Updating current user in database: email={}", userEmail);
+        
         // Находим пользователя по email из токена
-        User existUser = userRepository.findByEmailNativeQuery(userEmail)
-                .orElseThrow(() -> new UserNotFoundException(USER_WITH_EMAIL + userEmail + NOT_FOUND_SUFFIX));
+        Optional<User> userOpt = userRepository.findByEmailNativeQuery(userEmail);
+        
+        User existUser;
+        if (userOpt.isPresent()) {
+            existUser = userOpt.get();
+            log.debug("User found in database: id={}, email={}", existUser.getId(), existUser.getEmail());
+        } else {
+            // Если профиль не существует, создаем его автоматически
+            log.warn("User profile not found for email: {}. Creating profile automatically from update request.", userEmail);
+            
+            // Создаем нового пользователя с данными из запроса
+            User newUser = new User();
+            newUser.setEmail(userEmail);
+            // Используем данные из запроса или значения по умолчанию
+            newUser.setFirstName(dto.getFirstName() != null && !dto.getFirstName().isBlank() 
+                    ? dto.getFirstName() : "User");
+            newUser.setLastName(dto.getLastName() != null && !dto.getLastName().isBlank() 
+                    ? dto.getLastName() : "");
+            newUser.setBirthDate(dto.getBirthDate() != null 
+                    ? dto.getBirthDate() : java.time.LocalDate.now().minusYears(18));
+            newUser.setCards(new ArrayList<>());
+            
+            existUser = userRepository.save(newUser);
+            log.info("User profile automatically created: id={}, email={}, firstName={}, lastName={}", 
+                    existUser.getId(), existUser.getEmail(), existUser.getFirstName(), existUser.getLastName());
+        }
         
         // Обновляем пользователя (без проверки доступа, так как это свой профиль)
-        return updateUserInternal(existUser, dto);
+        UserDto updated = updateUserInternal(existUser, dto);
+        
+        log.info("User successfully updated in database: id={}, email={}", updated.getId(), updated.getEmail());
+        return updated;
     }
 
     /**
@@ -201,16 +289,27 @@ public class UserService {
      * @return обновленный пользователь
      * @throws UserNotFoundException если пользователь не найден
      */
-    @CachePut(key = "#id")
-    @CacheEvict(value = {"users_all", "users_by_email"}, allEntries = true)
+    @Caching(
+        put = @CachePut(key = "#id"),
+        evict = {
+            @CacheEvict(value = "users_all", allEntries = true),
+            @CacheEvict(value = "users_by_email", allEntries = true),
+            @CacheEvict(value = "users", allEntries = true)
+        }
+    )
     @Transactional
     public UserDto updateUserByAdmin(Long id, UpdateUserDto dto, String adminEmail) {
+        log.info("Admin {} updating user in database: id={}", adminEmail, id);
+        
         // Получаем пользователя по ID (без проверки доступа для админа)
         User existUser = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(PREFIX_WITH_ID + id + NOT_FOUND_SUFFIX));
         
         // Обновляем пользователя (без проверки доступа, так как это админ)
-        return updateUserInternal(existUser, dto);
+        UserDto updated = updateUserInternal(existUser, dto);
+        
+        log.info("User successfully updated by admin in database: id={}, email={}", updated.getId(), updated.getEmail());
+        return updated;
     }
 
     /**

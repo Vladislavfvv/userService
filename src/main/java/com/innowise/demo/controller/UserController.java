@@ -21,6 +21,8 @@ import com.innowise.demo.dto.UserDto;
 import com.innowise.demo.service.UserService;
 import com.innowise.demo.util.SecurityUtils;
 
+import org.springframework.beans.factory.annotation.Value;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -30,6 +32,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    
+    @Value("${authentication.service.internal-api-key:}")
+    private String internalApiKey;
 
     /**
      * Получение своих данных из JWT токена.
@@ -80,6 +85,39 @@ public class UserController {
         return ResponseEntity.ok(userService.createUser(dto));
     }
 
+    /**
+     * Внутренний endpoint для синхронизации создания пользователя из authentication-service.
+     * Используется только для внутренних вызовов от authentication-service с внутренним API ключом.
+     * НЕ предназначен для прямого использования клиентами.
+     * 
+     * @param dto данные пользователя (email, firstName, lastName, birthDate)
+     * @param apiKey внутренний API ключ из заголовка X-Internal-Api-Key
+     * @return созданный пользователь
+     */
+    @PostMapping("/sync")
+    public ResponseEntity<UserDto> syncCreateUser(
+            @Valid @RequestBody UserDto dto,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Internal-Api-Key", required = false) String apiKey) {
+        
+        // Проверка внутреннего API ключа
+        if (internalApiKey != null && !internalApiKey.isBlank()) {
+            if (apiKey == null || apiKey.isBlank() || !apiKey.equals(internalApiKey)) {
+                log.warn("Unauthorized attempt to sync create user. Invalid or missing internal API key.");
+                throw new AccessDeniedException("Invalid or missing internal API key");
+            }
+        } else {
+            log.warn("Internal API key not configured. Endpoint is accessible without authentication.");
+        }
+        
+        log.info("Received sync user creation request from authentication-service: email={}, firstName={}, lastName={}", 
+                dto.getEmail(), dto.getFirstName(), dto.getLastName());
+        
+        UserDto createdUser = userService.createUser(dto);
+        
+        log.info("User successfully synced and created: id={}, email={}", createdUser.getId(), createdUser.getEmail());
+        return ResponseEntity.ok(createdUser);
+    }
+
 
     /**
      * Получение пользователя по ID.
@@ -120,17 +158,26 @@ public class UserController {
     public ResponseEntity<UserDto> getUserByEmail(
             @RequestParam String email,
             Authentication authentication) {
+        log.info("Getting user by email: {} (requested by: {})", 
+                email, authentication != null ? SecurityUtils.getEmailFromToken(authentication) : "unknown");
+        
         // Проверка доступа ДО получения пользователя из базы
         // USER может запрашивать только свой email
         if (!SecurityUtils.isAdmin(authentication)) {
             String userEmail = SecurityUtils.getEmailFromToken(authentication);
+            log.debug("User is not ADMIN. Checking access: token email={}, requested email={}", userEmail, email);
             if (!userEmail.equals(email)) {
+                log.warn("Access denied: User {} tried to access email {}", userEmail, email);
                 throw new AccessDeniedException("Access denied: You can only access your own information");
             }
+        } else {
+            log.debug("User is ADMIN, skipping access check");
         }
         
         // Получаем пользователя из базы только после проверки доступа
+        log.debug("Fetching user from database for email: {}", email);
         UserDto user = userService.getUserByEmail(email);
+        log.info("User found: id={}, email={}", user.getId(), user.getEmail());
         
         return ResponseEntity.ok(user);
     }
@@ -145,16 +192,23 @@ public class UserController {
     public ResponseEntity<UserDto> updateCurrentUser(
             @RequestBody UpdateUserDto dto,
             Authentication authentication) {
+        log.info("Received update request for current user. DTO: firstName={}, lastName={}, name={}, surname={}, birthDate={}", 
+                dto.getFirstName(), dto.getLastName(), dto.getName(), dto.getSurname(), dto.getBirthDate());
+        
         // Извлекаем email из токена
         String userEmail;
         try {
             userEmail = SecurityUtils.getEmailFromToken(authentication);
+            log.debug("Extracted email from token: {}", userEmail);
         } catch (IllegalStateException e) {
+            log.error("Failed to extract email from token: {}", e.getMessage());
             throw new AccessDeniedException("Access denied: Authentication required.");
         }
         
         // Находим пользователя по email и обновляем его
-        return ResponseEntity.ok(userService.updateCurrentUser(userEmail, dto));
+        UserDto updated = userService.updateCurrentUser(userEmail, dto);
+        log.info("User successfully updated: id={}, email={}", updated.getId(), updated.getEmail());
+        return ResponseEntity.ok(updated);
     }
 
     /**
