@@ -127,6 +127,12 @@ public class AuthServiceClient {
             log.error("HTTP error when deleting user {} from authentication-service. Status: {}, Response: {}", 
                     email, ex.getStatusCode(), ex.getResponseBodyAsString(), ex);
             // Не выбрасываем исключение, чтобы не прерывать удаление в user-service
+        } catch (org.springframework.web.client.ResourceAccessException ex) {
+            // Сервис недоступен (Connection refused, UnresolvedAddressException и т.д.)
+            // Это нормально в тестовом окружении или когда authentication-service временно недоступен
+            log.warn("Authentication-service is not available. Failed to delete user {} from authentication-service. URL: {}. Error: {}", 
+                    email, baseUrl + "/auth/v1/internal/sync/users/" + email, ex.getMessage());
+            // Не выбрасываем исключение, чтобы не прерывать удаление в user-service
         } catch (RestClientException ex) {
             log.error("Failed to delete user {} from authentication-service. URL: {}. Error: {}", 
                     email, baseUrl + "/auth/v1/internal/sync/users/" + email, ex.getMessage(), ex);

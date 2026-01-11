@@ -47,6 +47,9 @@ public class SecurityConfig {
                         // Публичные эндпоинты - доступны без аутентификации для мониторинга
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         
+                        // Разрешаем OPTIONS запросы (CORS preflight) без аутентификации
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        
                         // Внутренний endpoint для синхронизации из authentication-service (проверка API ключа в контроллере)
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/sync").permitAll()
                         

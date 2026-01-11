@@ -1,12 +1,15 @@
 package com.innowise.demo.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 import com.innowise.demo.model.CardInfo;
 
 public interface CardInfoRepository extends JpaRepository<CardInfo, Long> {
@@ -35,4 +38,20 @@ public interface CardInfoRepository extends JpaRepository<CardInfo, Long> {
      */
     @Query("SELECT c FROM CardInfo c WHERE LOWER(c.user.email) = LOWER(:email)")
     Page<CardInfo> findAllByUser_EmailIgnoreCase(@Param("email") String email, Pageable pageable);
+    
+    /**
+     * Удаляет все карты пользователя по ID пользователя.
+     * Используется для гарантированного удаления всех карт пользователя.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM CardInfo c WHERE c.user.id = :userId")
+    int deleteAllByUserId(@Param("userId") Long userId);
+    
+    /**
+     * Удаляет карты по списку ID.
+     * Используется для гарантированного удаления конкретных карт.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM CardInfo c WHERE c.id IN :cardIds")
+    int deleteByIds(@Param("cardIds") List<Long> cardIds);
 }
