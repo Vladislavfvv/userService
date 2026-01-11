@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.cache.CacheManager;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +25,8 @@ import com.innowise.demo.model.User;
 import com.innowise.demo.repository.CardInfoRepository;
 import com.innowise.demo.repository.UserRepository;
 import com.innowise.demo.client.AuthServiceClient;
+
+import jakarta.persistence.EntityManager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -53,12 +56,19 @@ class UserServiceTest {
     @Mock
     private AuthServiceClient authServiceClient;
 
+    @Mock
+    private EntityManager entityManager;
+
     private User user;
     private UserDto userDto;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        
+        // Устанавливаем мок EntityManager через ReflectionTestUtils, 
+        // так как @InjectMocks не инжектит поля с @PersistenceContext
+        ReflectionTestUtils.setField(userService, "entityManager", entityManager);
 
         user = new User();
         user.setId(1L);
@@ -263,8 +273,8 @@ class UserServiceTest {
         Page<User> page = new PageImpl<>(users, PageRequest.of(0, 5), users.size());
 
         //when
-        // Когда кто-то вызовет userRepository.findAll(PageRequest.of(0,5)), верни этот объект page
-        when(userRepository.findAll(PageRequest.of(0,5))).thenReturn(page);
+        // Когда кто-то вызовет userRepository.findAll с любым PageRequest (включая с Sort), верни этот объект page
+        when(userRepository.findAll(any(PageRequest.class))).thenReturn(page);
         // Когда кто-то вызовет userMapper.toDto(user), верни userDto
         when(userMapper.toDto(user)).thenReturn(userDto);
 
@@ -274,7 +284,7 @@ class UserServiceTest {
         // then
         assertNotNull(response); // Проверка: что результат не null
         assertEquals(1, response.getContent().size()); // Проверка: что в результате 1 пользователь
-        verify(userRepository, times(1)).findAll(PageRequest.of(0,5)); // Проверка: что метод был вызван ровно 1 раз
+        verify(userRepository, times(1)).findAll(any(PageRequest.class)); // Проверка: что метод был вызван ровно 1 раз
     }
 
     // ----------------- updateCurrentUser -----------------
@@ -285,6 +295,8 @@ class UserServiceTest {
         // given
         when(userRepository.findByEmailNativeQuery("masha@gmail.com")).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Мок для перезагрузки пользователя после save (вызывается в updateUserInternal)
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
             User u = invocation.getArgument(0);
             UserDto dto = new UserDto();
@@ -335,6 +347,9 @@ class UserServiceTest {
         // given
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Мок для перезагрузки пользователя после save (вызывается в updateUserInternal)
+        // findById вызывается дважды: первый раз для получения пользователя, второй раз после save
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
             User u = invocation.getArgument(0);
             UserDto dto = new UserDto();
@@ -505,6 +520,8 @@ class UserServiceTest {
 
         // Мок save возвращает объект, который был передан
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Мок для перезагрузки пользователя после save (вызывается в updateUserInternal)
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         // Маппер toDto формирует DTO из текущего состояния объекта User
         when(userMapper.toDto(any(User.class))).thenAnswer(invocation -> {
             User u = invocation.getArgument(0);
@@ -543,8 +560,8 @@ class UserServiceTest {
         Page<User> emptyPage = new PageImpl<>(List.of(), PageRequest.of(0, 5), 0);
 
         //when
-        // Когда кто-то вызовет userRepository.findAll(PageRequest.of(0, 5)), верни пустую страницу
-        when(userRepository.findAll(PageRequest.of(0, 5))).thenReturn(emptyPage);
+        // Когда кто-то вызовет userRepository.findAll с любым PageRequest (включая с Sort), верни пустую страницу
+        when(userRepository.findAll(any(PageRequest.class))).thenReturn(emptyPage);
 
         // Вызываем тестируемый метод получения всех пользователей с пагинацией
         PagedUserResponse response = userService.findAllUsers(0, 5);
@@ -553,6 +570,6 @@ class UserServiceTest {
         assertNotNull(response); // Проверка: что результат не null
         assertEquals(0, response.getContent().size()); // Проверка: что в результате 0 пользователей
         assertEquals(0L, response.getTotalElements()); // Проверка: что всего элементов 0
-        verify(userRepository, times(1)).findAll(PageRequest.of(0, 5)); // Проверка: что метод был вызван ровно 1 раз
+        verify(userRepository, times(1)).findAll(any(PageRequest.class)); // Проверка: что метод был вызван ровно 1 раз
     }
 }

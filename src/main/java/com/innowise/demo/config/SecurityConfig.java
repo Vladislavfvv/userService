@@ -45,7 +45,13 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Публичные эндпоинты - доступны без аутентификации для мониторинга
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                        
+                        // Разрешаем OPTIONS запросы (CORS preflight) без аутентификации
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        
+                        // Внутренний endpoint для синхронизации из authentication-service (проверка API ключа в контроллере)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/sync").permitAll()
                         
                         // Эндпоинты только для ADMIN
                         .requestMatchers("/api/cache/**").hasRole("ADMIN")

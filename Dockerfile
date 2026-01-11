@@ -28,3 +28,17 @@ ENV SPRING_PROFILES_ACTIVE=docker
 # Запуск приложения
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
+# по шагам:
+# 1. Скачает базовый образ openjdk:21
+# 2. Скопирует мой JAR-файл в образ как app.jar
+# 3. Установит точку входа (команду запуска)
+# 4. Сохранит результат как user-service:latest
+
+# После сборки образа можно:
+# Запустить контейнер из этого образа:
+# docker run -d -p 8080:8080 user-service:latest
+# Просмотреть все образы:
+# docker images
+# Запушить в реестр (Docker Hub, GitLab Registry и т.д.):
+#     docker tag authentication-service:latest ваш-логин/authentication-service:latest
+#     docker push ваш-логин/authentication-service:latest 

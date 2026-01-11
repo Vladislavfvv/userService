@@ -24,3 +24,10 @@ PostgreSQL: localhost:5432
 Redis: localhost:6379
 
 e.g. http://localhost:8082/api/v1/users
+
+# Загрузить образ из GHCR в Minikube
+docker pull ghcr.io/vladislavfvv/user-service:latest
+docker save ghcr.io/vladislavfvv/user-service:latest | minikube image load -
+
+# Перезапустить поды
+kubectl delete pods -n microservices -l app=user-service
