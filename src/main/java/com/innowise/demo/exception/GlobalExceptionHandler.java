@@ -3,6 +3,7 @@ package com.innowise.demo.exception;
 import org.apache.coyote.BadRequestException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,11 +45,29 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+        // Собираем все ошибки валидации в одно сообщение
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
-                .findFirst()
-                .orElse("Validation error");
+                .reduce((first, second) -> first + "; " + second)
+                .orElse("Validation error: Please check your input data");
+        
+        // Если сообщение слишком длинное, возвращаем общее сообщение
+        if (message.length() > 200) {
+            message = "Validation error: Please check your input data. " + 
+                      ex.getBindingResult().getFieldErrors().size() + " field(s) have errors.";
+        }
+        
         return buildErrorResponse("VALIDATION_ERROR", message, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        String message = "Invalid request format. Please check your JSON data and field names.";
+        // Если это ошибка парсинга даты или другого типа, добавляем более конкретное сообщение
+        if (ex.getMessage() != null && ex.getMessage().contains("JSON parse error")) {
+            message = "Invalid JSON format. Please check your request body and ensure all fields are correct.";
+        }
+        return buildErrorResponse("BAD_REQUEST", message, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(BadRequestException.class)
@@ -81,7 +100,21 @@ public class GlobalExceptionHandler {
     // ================= Fallback =================
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAll(Exception ex) {
-        return buildErrorResponse("INTERNAL_ERROR", ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        // Логируем полную ошибку для отладки
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        log.error("Unexpected error occurred", ex);
+        
+        // Возвращаем понятное сообщение пользователю
+        String message = "An unexpected error occurred. Please check your input data and try again.";
+        // Если это известная ошибка, возвращаем более конкретное сообщение
+        if (ex.getMessage() != null && !ex.getMessage().isEmpty()) {
+            // Для некоторых ошибок возвращаем более понятное сообщение
+            if (ex.getMessage().contains("NullPointerException") || 
+                ex.getMessage().contains("IllegalArgumentException")) {
+                message = "Invalid request data. Please check your input and try again.";
+            }
+        }
+        return buildErrorResponse("INTERNAL_ERROR", message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     // ================= Helper Method =================

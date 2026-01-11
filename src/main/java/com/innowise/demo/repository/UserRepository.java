@@ -28,6 +28,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailNativeQuery(@Param("email") String email);
 
     //для решения проблемы ленивой инициализации:
+    // Используем стандартный метод findAll() - Spring Data JPA автоматически добавит ORDER BY из Pageable
     Page<User> findAll(Pageable pageable);
 
 

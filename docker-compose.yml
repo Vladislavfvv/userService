@@ -8,7 +8,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      # Внутри контейнера Postgres слушает на 5432, на хосте используем 5542,
+      # чтобы не конфликтовать с общим стеком из gateway-service (postgres-user: 5432:5432)
+      - "5542:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
@@ -52,6 +54,9 @@ services:
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       SPRING_PROFILES_ACTIVE: docker
+      # Authentication Service Configuration для синхронизации удаления пользователей
+      AUTHENTICATION_SERVICE_BASE_URL: http://authentication-service:8081
+      AUTHENTICATION_SERVICE_INTERNAL_API_KEY: dev-internal-api-key
     ports:
       - "8082:8080"
     networks:
